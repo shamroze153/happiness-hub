@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Happiness Hub</title>
+<link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<section class="hero" style="min-height:100vh; display:flex; align-items:center; padding:0;">
+  <div class="hero__orb hero__orb--1"></div>
+  <div class="hero__orb hero__orb--2"></div>
+  <div class="hero__orb hero__orb--3"></div>
+  <div class="container hero__content">
+    <div class="topnav__logo" style="width:56px; height:56px; font-size:26px; margin:0 auto 24px;">💰</div>
+    <div class="eyebrow" style="justify-content:center;">Admin Console</div>
+    <h1 class="gradient-text">Happiness Hub Admin</h1>
+    <p>Manage products, agents, sellers, and every order from one dashboard.</p>
+    <div class="hero__actions">
+      <button class="btn-primary" id="enterBtn" style="font-size:15px; padding:14px 32px;">Enter Dashboard →</button>
+    </div>
+  </div>
+</section>
+
+<script src="../lib/hh.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () { HH.mount(); });
+
+document.getElementById('enterBtn').addEventListener('click', function () {
+  localStorage.setItem('hh_admin', JSON.stringify({ token: 'admin_direct', actor_id: 'admin', actor_type: 'admin' }));
+  location.href = 'index.html';
+});
+</script>
+</body>
+</html>

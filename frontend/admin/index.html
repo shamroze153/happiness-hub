@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — Happiness Hub</title>
+<link rel="stylesheet" href="../styles/main.css">
+<style>
+  .bar-chart { display:flex; align-items:flex-end; gap:10px; height:160px; padding-top:10px; }
+  .bar-chart__col { flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; height:100%; justify-content:flex-end; }
+  .bar-chart__bar { width:100%; max-width:36px; background:linear-gradient(180deg, var(--c-primary), #9b8cff); border-radius:6px 6px 0 0; transition: height .6s var(--ease); box-shadow:0 0 16px rgba(124,106,255,.3); min-height:4px; }
+  .bar-chart__label { font-size:11px; color:var(--c-muted); }
+  .bar-chart__count { font-size:11px; font-weight:700; color:var(--c-text); }
+  .img-preview-box { margin-top:10px; border-radius:var(--r-md); overflow:hidden; border:1px solid var(--c-border2); aspect-ratio:16/9; background:var(--c-surface); display:flex; align-items:center; justify-content:center; }
+  .img-preview-box img { width:100%; height:100%; object-fit:cover; }
+  .img-preview-box .ph { color:var(--c-muted); font-size:12.5px; }
+</style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<div class="mobile-topbar">
+  <div class="mobile-topbar__brand"><span style="font-size:20px;">💰</span> Admin</div>
+  <button class="mobile-topbar__menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+</div>
+
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__brand"><span style="font-size:20px;">💰</span> Happiness Hub</div>
+    <a href="#" class="sidebar__link" data-view="dashboard"><span class="ico">📊</span> Dashboard</a>
+    <a href="#" class="sidebar__link" data-view="products"><span class="ico">🛍️</span> Products</a>
+    <a href="#" class="sidebar__link" data-view="agents"><span class="ico">🤝</span> Agents</a>
+    <a href="#" class="sidebar__link" data-view="sellers"><span class="ico">🏪</span> Sellers</a>
+    <a href="#" class="sidebar__link" data-view="orders"><span class="ico">📦</span> All Orders</a>
+    <div class="sidebar__footer">
+      <a href="../index.html" target="_blank" class="sidebar__link" style="margin-bottom:8px;"><span class="ico">↗</span> View Storefront</a>
+      <button class="btn-ghost btn-sm btn-block" id="logoutBtn">Log Out</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+
+    <!-- ============================== DASHBOARD VIEW ============================== -->
+    <div id="view-dashboard">
+      <div class="page-header"><div><h1>Dashboard</h1><p>Live snapshot of the business.</p></div></div>
+      <div class="grid-stats mb-24" id="dashStats"><div class="stat-card"><div class="skeleton" style="height:34px;"></div></div></div>
+      <div class="card mb-24">
+        <div class="form-label mb-16">Order Volume — Last 7 Days</div>
+        <div class="bar-chart" id="volumeChart"></div>
+      </div>
+      <div class="card">
+        <div class="form-label mb-16">Recent Orders</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Order</th><th>Buyer</th><th>Refund Via</th><th>Amount</th><th>Status</th><th>Submitted</th></tr></thead>
+            <tbody id="recentOrdersBody"><tr><td colspan="6"><div class="loading-row"><span class="btn-spinner"></span> Loading…</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== PRODUCTS VIEW ============================== -->
+    <div id="view-products" class="hidden">
+      <div class="page-header">
+        <div><h1>Products</h1><p>Manage cashback offers.</p></div>
+        <button class="btn-primary" id="addProductBtn">+ Add Product</button>
+      </div>
+      <div class="card mb-16">
+        <input type="search" id="productSearchInput" class="form-control" placeholder="🔍 Search products…">
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th></th><th>Title</th><th>Category</th><th>Cashback</th><th>Status</th><th>Stock</th><th></th></tr></thead>
+          <tbody id="productsBody"><tr><td colspan="7"><div class="loading-row"><span class="btn-spinner"></span> Loading…</div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============================== AGENTS VIEW ============================== -->
+    <div id="view-agents" class="hidden">
+      <div class="page-header">
+        <div><h1>Agents</h1><p>Referral partners who place orders on buyers' behalf.</p></div>
+        <button class="btn-primary" id="addAgentBtn">+ Add Agent</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Agent ID</th><th>WhatsApp</th><th>Commission</th><th>Orders</th><th>Status</th><th></th></tr></thead>
+          <tbody id="agentsBody"><tr><td colspan="7"><div class="loading-row"><span class="btn-spinner"></span> Loading…</div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============================== SELLERS VIEW ============================== -->
+    <div id="view-sellers" class="hidden">
+      <div class="page-header">
+        <div><h1>Sellers</h1><p>Stores who fulfill and verify cashback orders.</p></div>
+        <button class="btn-primary" id="addSellerBtn">+ Add Seller</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Store</th><th>Seller ID</th><th>WhatsApp</th><th>Status</th><th>Created</th></tr></thead>
+          <tbody id="sellersBody"><tr><td colspan="5"><div class="loading-row"><span class="btn-spinner"></span> Loading…</div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============================== ALL ORDERS VIEW ============================== -->
+    <div id="view-orders" class="hidden">
+      <div class="page-header"><div><h1>All Orders</h1><p>Search, filter, and update every order in the system.</p></div></div>
+      <div class="card mb-16">
+        <div class="flex gap-12 flex-wrap items-center">
+          <input type="search" id="orderSearchInput" class="form-control" style="flex:1; min-width:200px;" placeholder="🔍 Buyer name, order ID, agent ID…">
+          <select id="orderStatusFilter" class="form-control" style="max-width:200px;">
+            <option value="">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Ordered">Ordered</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Cashback Sent">Cashback Sent</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Need More Info">Need More Info</option>
+            <option value="PayPal Issue">PayPal Issue</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Order</th><th>Buyer</th><th>Agent</th><th>Refund Via</th><th>Amount</th><th>Proof</th><th>Status</th><th>Submitted</th><th></th></tr></thead>
+          <tbody id="allOrdersBody"><tr><td colspan="9"><div class="loading-row"><span class="btn-spinner"></span> Loading…</div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ============================== PRODUCT MODAL ============================== -->
+<div class="modal-overlay" id="productModalOverlay">
+  <div class="modal modal--lg">
+    <div class="modal__header"><div class="modal__title" id="productModalTitle">Add Product</div><button class="modal__close" id="closeProductModalBtn">✕</button></div>
+    <div class="modal__body">
+      <div class="modal__section-title">Required</div>
+      <div class="form-group"><label class="form-label">Title</label><input type="text" id="pTitle" class="form-control" placeholder="Product name"></div>
+      <div class="form-group"><label class="form-label">Affiliate Link</label><input type="text" id="pLink" class="form-control" placeholder="https://..."></div>
+      <div class="form-group"><label class="form-label">Cashback Amount</label><input type="number" step="0.01" id="pCashback" class="form-control" placeholder="0.00"></div>
+
+      <div class="modal__section-title">Media &amp; Display</div>
+      <div class="form-group">
+        <label class="form-label">Image URL <span class="opt">(direct image link, not a page link)</span></label>
+        <input type="text" id="pImageUrl" class="form-control" placeholder="https://i.ibb.co/.../img.jpg">
+        <div class="img-preview-box" id="pImagePreview"><span class="ph">Live preview will appear here</span></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <input type="text" id="pCategory" class="form-control" list="categoryOptions" placeholder="e.g. Electronics">
+        <datalist id="categoryOptions"></datalist>
+      </div>
+      <div class="checkbox-row form-group"><input type="checkbox" id="pFeatured"><label for="pFeatured" class="form-label" style="margin-bottom:0;">Featured product</label></div>
+
+      <div class="modal__section-title">Details</div>
+      <div class="form-group"><label class="form-label">Sold By</label><input type="text" id="pSoldBy" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Description</label><textarea id="pDescription" class="form-control"></textarea></div>
+      <div class="form-group"><label class="form-label">Cashback Policy</label><textarea id="pPolicy" class="form-control"></textarea></div>
+      <div class="form-group"><label class="form-label">Claim Instructions</label><textarea id="pInstructions" class="form-control"></textarea></div>
+      <div class="row-2">
+        <div class="form-group"><label class="form-label">Deadline <span class="opt">(optional)</span></label><input type="date" id="pDeadline" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Stock Status</label>
+          <select id="pStockStatus" class="form-control"><option value="Available">Available</option><option value="Limited">Limited</option><option value="Out">Out</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Tags <span class="opt">(comma separated)</span></label><input type="text" id="pTags" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Badge Text <span class="opt">(optional)</span></label><input type="text" id="pBadgeText" class="form-control" placeholder="e.g. Limited Time"></div>
+    </div>
+    <div class="modal__footer"><button class="btn-ghost" id="cancelProductBtn">Cancel</button><button class="btn-primary" id="saveProductBtn">Save Product</button></div>
+  </div>
+</div>
+
+<!-- ============================== AGENT MODAL ============================== -->
+<div class="modal-overlay" id="agentModalOverlay">
+  <div class="modal">
+    <div class="modal__header"><div class="modal__title">Add Agent</div><button class="modal__close" id="closeAgentModalBtn">✕</button></div>
+    <div class="modal__body">
+      <div class="form-group"><label class="form-label">Name</label><input type="text" id="aName" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Password</label><input type="password" id="aPassword" class="form-control"></div>
+      <div class="form-group"><label class="form-label">WhatsApp</label><input type="tel" id="aWhatsapp" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Email <span class="opt">(optional)</span></label><input type="email" id="aEmail" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Commission Rate (%) <span class="opt">(optional)</span></label><input type="number" step="0.1" id="aCommission" class="form-control" placeholder="0"></div>
+    </div>
+    <div class="modal__footer"><button class="btn-ghost" id="cancelAgentBtn">Cancel</button><button class="btn-primary" id="saveAgentBtn">Add Agent</button></div>
+  </div>
+</div>
+
+<!-- ============================== SELLER MODAL ============================== -->
+<div class="modal-overlay" id="sellerModalOverlay">
+  <div class="modal">
+    <div class="modal__header"><div class="modal__title">Add Seller</div><button class="modal__close" id="closeSellerModalBtn">✕</button></div>
+    <div class="modal__body">
+      <div class="form-group"><label class="form-label">Store Name</label><input type="text" id="sStoreName" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Contact Name</label><input type="text" id="sName" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Password</label><input type="password" id="sPassword" class="form-control"></div>
+      <div class="form-group"><label class="form-label">WhatsApp</label><input type="tel" id="sWhatsapp" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Email <span class="opt">(optional)</span></label><input type="email" id="sEmail" class="form-control"></div>
+    </div>
+    <div class="modal__footer"><button class="btn-ghost" id="cancelSellerBtn">Cancel</button><button class="btn-primary" id="saveSellerBtn">Add Seller</button></div>
+  </div>
+</div>
+
+<!-- ============================== ORDER UPDATE MODAL (shared by Orders + Dashboard) ============================== -->
+<div class="modal-overlay" id="orderModalOverlay">
+  <div class="modal modal--lg">
+    <div class="modal__header"><div class="modal__title">Update Order</div><button class="modal__close" id="closeOrderModalBtn">✕</button></div>
+    <div class="modal__body" id="orderModalBody"></div>
+    <div class="modal__footer"><button class="btn-ghost" id="cancelOrderUpdateBtn">Cancel</button><button class="btn-primary" id="saveOrderUpdateBtn">Save Changes</button></div>
+  </div>
+</div>
+
+<script src="../lib/hh.js"></script>
+<script>
+let currentView = 'dashboard';
+let productsCache = [];
+let agentsCache = [];
+let sellersCache = [];
+let allOrdersCache = [];
+let activeOrder = null;
+let editingProductId = null;
+
+// ---------------------------------------------------------------- nav
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('[id^="view-"]').forEach(function (el) { el.classList.add('hidden'); });
+  document.getElementById('view-' + view).classList.remove('hidden');
+  document.querySelectorAll('.sidebar__link[data-view]').forEach(function (el) {
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+  document.getElementById('sidebar').classList.remove('sidebar--open');
+  document.getElementById('sidebarOverlay').classList.remove('sidebar-overlay--visible');
+
+  if (view === 'dashboard') loadDashboard();
+  if (view === 'products' && !productsCache.length) loadProducts();
+  if (view === 'agents' && !agentsCache.length) loadAgents();
+  if (view === 'sellers' && !sellersCache.length) loadSellers();
+  if (view === 'orders') loadAllOrders();
+}
+
+document.querySelectorAll('.sidebar__link[data-view]').forEach(function (link) {
+  link.addEventListener('click', function (e) { e.preventDefault(); switchView(link.dataset.view); });
+});
+
+document.getElementById('menuBtn').addEventListener('click', function () {
+  document.getElementById('sidebar').classList.add('sidebar--open');
+  document.getElementById('sidebarOverlay').classList.add('sidebar-overlay--visible');
+});
+document.getElementById('sidebarOverlay').addEventListener('click', function () {
+  document.getElementById('sidebar').classList.remove('sidebar--open');
+  document.getElementById('sidebarOverlay').classList.remove('sidebar-overlay--visible');
+});
+document.getElementById('logoutBtn').addEventListener('click', function () {
+  localStorage.removeItem('hh_admin');
+  location.href = 'login.html';
+});
+
+// ============================================================================
+// DASHBOARD
+// ============================================================================
+async function loadDashboard() {
+  document.getElementById('dashStats').innerHTML = `<div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>`.repeat(8);
+  const result = await HH.get('getAdminDashboard');
+  if (!result.success) {
+    document.getElementById('dashStats').innerHTML = `<div class="err-box"><span class="err-box__icon">⚠️</span><span>${HH.esc(result.error)}</span></div>`;
+    return;
+  }
+
+  const s = result.stats;
+  document.getElementById('dashStats').innerHTML = `
+    <div class="stat-card"><div class="stat-card__label">🛍️ Active Products</div><div class="stat-card__value">${s.active_products}</div></div>
+    <div class="stat-card"><div class="stat-card__label">📦 Total Orders</div><div class="stat-card__value">${s.total_orders}</div></div>
+    <div class="stat-card stat-card--accent"><div class="stat-card__label">📅 Today's Orders</div><div class="stat-card__value">${s.today_orders}</div></div>
+    <div class="stat-card stat-card--warn"><div class="stat-card__label">⏳ Pending</div><div class="stat-card__value">${s.pending_orders}</div></div>
+    <div class="stat-card stat-card--accent"><div class="stat-card__label">💸 Cashback Sent</div><div class="stat-card__value">${s.cashback_sent_count}</div></div>
+    <div class="stat-card stat-card--pink"><div class="stat-card__label">💰 Total $ Sent</div><div class="stat-card__value">${HH.fmt$(s.total_cashback_sent)}</div></div>
+    <div class="stat-card"><div class="stat-card__label">🤝 Agents</div><div class="stat-card__value">${s.agents_count}</div></div>
+    <div class="stat-card"><div class="stat-card__label">🏪 Sellers</div><div class="stat-card__value">${s.sellers_count}</div></div>`;
+  HH.staggerChildren(document.getElementById('dashStats'), 0, 50);
+
+  const maxCount = Math.max.apply(null, result.volume.map(function (v) { return v.count; }).concat([1]));
+  document.getElementById('volumeChart').innerHTML = result.volume.map(function (v) {
+    const heightPct = Math.max((v.count / maxCount) * 100, 3);
+    return `<div class="bar-chart__col">
+      <div class="bar-chart__count">${v.count}</div>
+      <div class="bar-chart__bar" style="height:${heightPct}%;"></div>
+      <div class="bar-chart__label">${HH.esc(v.date)}</div>
+    </div>`;
+  }).join('');
+
+  const tbody = document.getElementById('recentOrdersBody');
+  if (!result.recent_orders.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-state__text">No orders yet.</div></div></td></tr>`;
+  } else {
+    tbody.innerHTML = result.recent_orders.map(function (o) {
+      const badge = HH.statusBadge(o.status);
+      return `<tr>
+        <td><strong>${HH.esc(o.order_id)}</strong></td>
+        <td>${HH.esc(o.buyer_name)}</td>
+        <td>${HH.esc(o.payment_method || '—')}</td>
+        <td>${HH.fmt$(o.cashback_amount)}</td>
+        <td><span class="badge ${badge.className}">${badge.icon} ${HH.esc(badge.label)}</span></td>
+        <td class="text-muted">${HH.esc(HH.timeAgo(o.submitted_at))}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ============================================================================
+// PRODUCTS
+// ============================================================================
+async function loadProducts() {
+  const result = await HH.get('getProducts', {});
+  if (!result.success) {
+    document.getElementById('productsBody').innerHTML = `<tr><td colspan="7"><div class="err-box"><span class="err-box__icon">⚠️</span><span>${HH.esc(result.error)}</span></div></td></tr>`;
+    return;
+  }
+  // getProducts only returns Active items; admin needs Disabled/Deleted too, so fetch all via getAllOrders-style raw read isn't available —
+  // instead we fetch active products plus rely on updateProduct/deleteProduct results to keep cache fresh. For full visibility, refetch raw sheet via getProducts with no filter still only returns Active, so we union with any disabled items we already know about.
+  productsCache = result.products;
+  document.getElementById('categoryOptions').innerHTML = result.categories.map(function (c) { return `<option value="${HH.esc(c)}">`; }).join('');
+  renderProductsTable(productsCache);
+}
+
+function renderProductsTable(products) {
+  const tbody = document.getElementById('productsBody');
+  if (!products.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state__icon">🛍️</div><div class="empty-state__title">No products yet</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = products.map(function (p) {
+    const statusBadge = HH.productStatusBadge(p.status);
+    const stockBadge = HH.stockBadge(p.stock_status);
+    const img = p.image_url && String(p.image_url).trim() ? p.image_url : '';
+    return `<tr>
+      <td><img class="tbl-thumb" src="${HH.esc(img)}" onerror="this.style.visibility='hidden'"></td>
+      <td><strong>${HH.esc(p.title)}</strong></td>
+      <td><span class="badge badge--info">${HH.esc(p.category || 'General')}</span></td>
+      <td>${HH.fmt$(p.cashback_amount)}</td>
+      <td><span class="badge ${statusBadge.className}">${statusBadge.icon} ${HH.esc(statusBadge.label)}</span></td>
+      <td><span class="badge ${stockBadge.className}">${stockBadge.icon} ${HH.esc(stockBadge.label)}</span></td>
+      <td>
+        <div class="tbl-actions">
+          <button class="btn-ghost btn-sm edit-product-btn" data-id="${HH.esc(p.product_id)}">Edit</button>
+          <button class="btn-ghost btn-sm toggle-product-btn" data-id="${HH.esc(p.product_id)}" data-status="${HH.esc(p.status)}">${p.status === 'Active' ? 'Disable' : 'Enable'}</button>
+          <button class="btn-danger btn-sm delete-product-btn" data-id="${HH.esc(p.product_id)}">Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.edit-product-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { openProductModal(btn.dataset.id); });
+  });
+  tbody.querySelectorAll('.toggle-product-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const newStatus = btn.dataset.status === 'Active' ? 'Disabled' : 'Active';
+      const result = await HH.post('updateProduct', { product_id: btn.dataset.id, status: newStatus });
+      if (!result.success) { HH.toast(result.error || 'Could not update product.', 'error'); return; }
+      HH.toast('Product ' + (newStatus === 'Active' ? 'enabled' : 'disabled') + '.', 'success');
+      loadProducts();
+    });
+  });
+  tbody.querySelectorAll('.delete-product-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      if (!confirm('Delete this product? It will be hidden from the storefront.')) return;
+      const result = await HH.post('deleteProduct', { product_id: btn.dataset.id });
+      if (!result.success) { HH.toast(result.error || 'Could not delete product.', 'error'); return; }
+      HH.toast('Product deleted.', 'success');
+      loadProducts();
+    });
+  });
+}
+
+document.getElementById('productSearchInput').addEventListener('input', function (e) {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) { renderProductsTable(productsCache); return; }
+  renderProductsTable(productsCache.filter(function (p) {
+    return String(p.title).toLowerCase().indexOf(q) !== -1 || String(p.category || '').toLowerCase().indexOf(q) !== -1;
+  }));
+});
+
+function clearProductForm() {
+  ['pTitle','pLink','pCashback','pImageUrl','pCategory','pSoldBy','pDescription','pPolicy','pInstructions','pDeadline','pTags','pBadgeText'].forEach(function (id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('pFeatured').checked = false;
+  document.getElementById('pStockStatus').value = 'Available';
+  document.getElementById('pImagePreview').innerHTML = '<span class="ph">Live preview will appear here</span>';
+}
+
+function openProductModal(productId) {
+  editingProductId = productId || null;
+  clearProductForm();
+  document.getElementById('productModalTitle').textContent = productId ? 'Edit Product' : 'Add Product';
+
+  if (productId) {
+    const p = productsCache.find(function (x) { return x.product_id === productId; });
+    if (p) {
+      document.getElementById('pTitle').value = p.title || '';
+      document.getElementById('pLink').value = p.link || '';
+      document.getElementById('pCashback').value = p.cashback_amount || '';
+      document.getElementById('pImageUrl').value = p.image_url || '';
+      document.getElementById('pCategory').value = p.category || '';
+      document.getElementById('pFeatured').checked = String(p.featured).trim().toUpperCase() === 'TRUE';
+      document.getElementById('pSoldBy').value = p.sold_by || '';
+      document.getElementById('pDescription').value = p.description || '';
+      document.getElementById('pPolicy').value = p.policy || '';
+      document.getElementById('pInstructions').value = p.instructions || '';
+      document.getElementById('pDeadline').value = p.deadline ? String(p.deadline).substring(0, 10) : '';
+      document.getElementById('pStockStatus').value = p.stock_status || 'Available';
+      document.getElementById('pTags').value = p.tags || '';
+      document.getElementById('pBadgeText').value = p.badge_text || '';
+      updateImagePreview(p.image_url);
+    }
+  }
+
+  document.getElementById('productModalOverlay').classList.add('modal-overlay--visible');
+}
+
+function updateImagePreview(url) {
+  const box = document.getElementById('pImagePreview');
+  if (!url || !String(url).trim()) { box.innerHTML = '<span class="ph">Live preview will appear here</span>'; return; }
+  box.innerHTML = `<img src="${HH.esc(url)}" onerror="this.parentElement.innerHTML='<span class=&quot;ph&quot;>⚠️ Could not load image — check it\\'s a direct image link, not a page link</span>'">`;
+}
+
+document.getElementById('pImageUrl').addEventListener('input', function (e) { updateImagePreview(e.target.value); });
+
+document.getElementById('addProductBtn').addEventListener('click', function () { openProductModal(null); });
+document.getElementById('closeProductModalBtn').addEventListener('click', closeProductModal);
+document.getElementById('cancelProductBtn').addEventListener('click', closeProductModal);
+document.getElementById('productModalOverlay').addEventListener('click', function (e) { if (e.target === this) closeProductModal(); });
+function closeProductModal() { document.getElementById('productModalOverlay').classList.remove('modal-overlay--visible'); }
+
+document.getElementById('saveProductBtn').addEventListener('click', async function () {
+  const title = document.getElementById('pTitle').value.trim();
+  const link = document.getElementById('pLink').value.trim();
+  const cashback = document.getElementById('pCashback').value.trim();
+
+  if (!title || !link || !cashback) {
+    HH.toast('Title, link, and cashback amount are required.', 'error');
+    return;
+  }
+
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-spinner"></span> Saving…';
+
+  const payload = {
+    title: title,
+    link: link,
+    cashback_amount: cashback,
+    image_url: document.getElementById('pImageUrl').value.trim(),
+    category: document.getElementById('pCategory').value.trim(),
+    featured: document.getElementById('pFeatured').checked ? 'TRUE' : 'FALSE',
+    sold_by: document.getElementById('pSoldBy').value.trim(),
+    description: document.getElementById('pDescription').value.trim(),
+    policy: document.getElementById('pPolicy').value.trim(),
+    instructions: document.getElementById('pInstructions').value.trim(),
+    deadline: document.getElementById('pDeadline').value,
+    stock_status: document.getElementById('pStockStatus').value,
+    tags: document.getElementById('pTags').value.trim(),
+    badge_text: document.getElementById('pBadgeText').value.trim()
+  };
+
+  let result;
+  if (editingProductId) {
+    payload.product_id = editingProductId;
+    result = await HH.post('updateProduct', payload);
+  } else {
+    result = await HH.post('addProduct', payload);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Save Product';
+
+  if (!result.success) { HH.toast(result.error || 'Could not save product.', 'error'); return; }
+
+  HH.toast(editingProductId ? 'Product updated!' : 'Product added!', 'success');
+  closeProductModal();
+  loadProducts();
+});
+
+// ============================================================================
+// AGENTS
+// ============================================================================
+async function loadAgents() {
+  const result = await HH.get('getAgents');
+  if (!result.success) {
+    document.getElementById('agentsBody').innerHTML = `<tr><td colspan="7"><div class="err-box"><span class="err-box__icon">⚠️</span><span>${HH.esc(result.error)}</span></div></td></tr>`;
+    return;
+  }
+  agentsCache = result.agents;
+  renderAgentsTable(agentsCache);
+}
+
+function renderAgentsTable(agents) {
+  const tbody = document.getElementById('agentsBody');
+  if (!agents.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state__icon">🤝</div><div class="empty-state__title">No agents yet</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = agents.map(function (a) {
+    const refLink = location.origin + location.pathname.replace('admin/index.html', 'index.html') + '?ref=' + a.agent_id;
+    return `<tr>
+      <td><strong>${HH.esc(a.name)}</strong></td>
+      <td class="text-muted">${HH.esc(a.agent_id)}</td>
+      <td>${HH.esc(a.whatsapp)}</td>
+      <td>${HH.esc(a.commission_rate || 0)}%</td>
+      <td>${HH.esc(a.total_orders || 0)}</td>
+      <td><span class="badge ${a.status === 'Active' ? 'badge--ok' : 'badge--warn'}">${HH.esc(a.status)}</span></td>
+      <td>
+        <div class="tbl-actions">
+          <button class="btn-ghost btn-sm copy-ref-btn" data-link="${HH.esc(refLink)}">📋 Copy Link</button>
+          <button class="btn-ghost btn-sm toggle-agent-btn" data-id="${HH.esc(a.agent_id)}" data-status="${HH.esc(a.status)}">${a.status === 'Active' ? 'Disable' : 'Enable'}</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.copy-ref-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(btn.dataset.link).then(function () { HH.toast('Referral link copied!', 'success'); })
+        .catch(function () { HH.toast('Could not copy — please copy manually.', 'error'); });
+    });
+  });
+  tbody.querySelectorAll('.toggle-agent-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const newStatus = btn.dataset.status === 'Active' ? 'Disabled' : 'Active';
+      const result = await HH.post('updateAgent', { agent_id: btn.dataset.id, status: newStatus });
+      if (!result.success) { HH.toast(result.error || 'Could not update agent.', 'error'); return; }
+      HH.toast('Agent ' + (newStatus === 'Active' ? 'enabled' : 'disabled') + '.', 'success');
+      loadAgents();
+    });
+  });
+}
+
+document.getElementById('addAgentBtn').addEventListener('click', function () {
+  ['aName','aPassword','aWhatsapp','aEmail','aCommission'].forEach(function (id) { document.getElementById(id).value = ''; });
+  document.getElementById('agentModalOverlay').classList.add('modal-overlay--visible');
+});
+document.getElementById('closeAgentModalBtn').addEventListener('click', closeAgentModal);
+document.getElementById('cancelAgentBtn').addEventListener('click', closeAgentModal);
+document.getElementById('agentModalOverlay').addEventListener('click', function (e) { if (e.target === this) closeAgentModal(); });
+function closeAgentModal() { document.getElementById('agentModalOverlay').classList.remove('modal-overlay--visible'); }
+
+document.getElementById('saveAgentBtn').addEventListener('click', async function () {
+  const name = document.getElementById('aName').value.trim();
+  const password = document.getElementById('aPassword').value;
+  const whatsapp = document.getElementById('aWhatsapp').value.trim();
+
+  if (!name || !password || !whatsapp) { HH.toast('Name, password, and WhatsApp are required.', 'error'); return; }
+
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-spinner"></span> Adding…';
+
+  const result = await HH.post('addAgent', {
+    name: name, password: password, whatsapp: whatsapp,
+    email: document.getElementById('aEmail').value.trim(),
+    commission_rate: document.getElementById('aCommission').value.trim() || 0
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Add Agent';
+
+  if (!result.success) { HH.toast(result.error || 'Could not add agent.', 'error'); return; }
+
+  HH.toast('Agent added! ID: ' + result.agent.agent_id, 'success');
+  closeAgentModal();
+  loadAgents();
+});
+
+// ============================================================================
+// SELLERS
+// ============================================================================
+async function loadSellers() {
+  const result = await HH.get('getSellers');
+  if (!result.success) {
+    document.getElementById('sellersBody').innerHTML = `<tr><td colspan="5"><div class="err-box"><span class="err-box__icon">⚠️</span><span>${HH.esc(result.error)}</span></div></td></tr>`;
+    return;
+  }
+  sellersCache = result.sellers;
+  renderSellersTable(sellersCache);
+}
+
+function renderSellersTable(sellers) {
+  const tbody = document.getElementById('sellersBody');
+  if (!sellers.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state__icon">🏪</div><div class="empty-state__title">No sellers yet</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sellers.map(function (s) {
+    return `<tr>
+      <td><strong>${HH.esc(s.store_name || s.name)}</strong></td>
+      <td class="text-muted">${HH.esc(s.seller_id)}</td>
+      <td>${HH.esc(s.whatsapp)}</td>
+      <td><span class="badge ${s.status === 'Active' ? 'badge--ok' : 'badge--warn'}">${HH.esc(s.status)}</span></td>
+      <td class="text-muted">${HH.fmtDate(s.created_at)}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('addSellerBtn').addEventListener('click', function () {
+  ['sStoreName','sName','sPassword','sWhatsapp','sEmail'].forEach(function (id) { document.getElementById(id).value = ''; });
+  document.getElementById('sellerModalOverlay').classList.add('modal-overlay--visible');
+});
+document.getElementById('closeSellerModalBtn').addEventListener('click', closeSellerModal);
+document.getElementById('cancelSellerBtn').addEventListener('click', closeSellerModal);
+document.getElementById('sellerModalOverlay').addEventListener('click', function (e) { if (e.target === this) closeSellerModal(); });
+function closeSellerModal() { document.getElementById('sellerModalOverlay').classList.remove('modal-overlay--visible'); }
+
+document.getElementById('saveSellerBtn').addEventListener('click', async function () {
+  const name = document.getElementById('sName').value.trim();
+  const password = document.getElementById('sPassword').value;
+  const whatsapp = document.getElementById('sWhatsapp').value.trim();
+
+  if (!name || !password || !whatsapp) { HH.toast('Name, password, and WhatsApp are required.', 'error'); return; }
+
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-spinner"></span> Adding…';
+
+  const result = await HH.post('addSeller', {
+    name: name, password: password, whatsapp: whatsapp,
+    store_name: document.getElementById('sStoreName').value.trim(),
+    email: document.getElementById('sEmail').value.trim()
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Add Seller';
+
+  if (!result.success) { HH.toast(result.error || 'Could not add seller.', 'error'); return; }
+
+  HH.toast('Seller added! ID: ' + result.seller_id, 'success');
+  closeSellerModal();
+  loadSellers();
+});
+
+// ============================================================================
+// ALL ORDERS
+// ============================================================================
+let orderSearch = '';
+let orderStatusFilterVal = '';
+
+async function loadAllOrders() {
+  const result = await HH.get('getAllOrders');
+  if (!result.success) {
+    document.getElementById('allOrdersBody').innerHTML = `<tr><td colspan="9"><div class="err-box"><span class="err-box__icon">⚠️</span><span>${HH.esc(result.error)}</span></div></td></tr>`;
+    return;
+  }
+  allOrdersCache = result.orders;
+  applyOrderFilters();
+}
+
+function applyOrderFilters() {
+  let filtered = allOrdersCache;
+  if (orderStatusFilterVal) filtered = filtered.filter(function (o) { return String(o.status).trim() === orderStatusFilterVal; });
+  if (orderSearch) {
+    const q = orderSearch.toLowerCase();
+    filtered = filtered.filter(function (o) {
+      return [o.buyer_name, o.order_id, o.agent_id, o.product_title].some(function (f) {
+        return String(f || '').toLowerCase().indexOf(q) !== -1;
+      });
+    });
+  }
+  renderAllOrdersTable(filtered);
+}
+
+function renderAllOrdersTable(orders) {
+  const tbody = document.getElementById('allOrdersBody');
+  if (!orders.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state__icon">📭</div><div class="empty-state__title">No orders match</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = orders.map(function (o) {
+    const badge = HH.statusBadge(o.status);
+    const hasDelivery = String(o.delivery_screenshot_url || '').trim();
+    return `<tr>
+      <td><strong>${HH.esc(o.order_id)}</strong><div class="text-muted" style="font-size:11.5px;">${HH.esc(o.product_title || '')}</div></td>
+      <td>${HH.esc(o.buyer_name)}</td>
+      <td class="text-muted">${HH.esc(o.agent_id || 'direct')}</td>
+      <td>${HH.esc(o.payment_method || '—')}</td>
+      <td>${HH.fmt$(o.cashback_amount)}</td>
+      <td>${hasDelivery ? '📦' : '⏳'}</td>
+      <td><span class="badge ${badge.className}">${badge.icon} ${HH.esc(badge.label)}</span></td>
+      <td class="text-muted">${HH.esc(HH.timeAgo(o.submitted_at))}</td>
+      <td><button class="btn-ghost btn-sm open-order-update-btn" data-order-id="${HH.esc(o.order_id)}">Update</button></td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.open-order-update-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { openOrderModal(btn.dataset.orderId); });
+  });
+}
+
+document.getElementById('orderSearchInput').addEventListener('input', function (e) { orderSearch = e.target.value.trim(); applyOrderFilters(); });
+document.getElementById('orderStatusFilter').addEventListener('change', function (e) { orderStatusFilterVal = e.target.value; applyOrderFilters(); });
+
+function openOrderModal(orderId) {
+  activeOrder = allOrdersCache.find(function (o) { return o.order_id === orderId; });
+  if (!activeOrder) return;
+
+  const hasDelivery = String(activeOrder.delivery_screenshot_url || '').trim();
+  document.getElementById('orderModalBody').innerHTML = `
+    <div class="modal__section-title">Buyer Information</div>
+    <div class="card mb-16">
+      <div class="flex justify-between mb-8"><span class="text-muted">Name</span><strong>${HH.esc(activeOrder.buyer_name)}</strong></div>
+      <div class="flex justify-between mb-8"><span class="text-muted">WhatsApp</span><strong>${HH.esc(activeOrder.buyer_whatsapp)}</strong></div>
+      <div class="flex justify-between mb-8"><span class="text-muted">Product</span><strong>${HH.esc(activeOrder.product_title)}</strong></div>
+      <div class="flex justify-between"><span class="text-muted">Agent</span><strong>${HH.esc(activeOrder.agent_id || 'direct')}</strong></div>
+    </div>
+    <div class="modal__section-title">Refund Method</div>
+    <div class="card mb-16">
+      <div class="flex justify-between mb-8"><span class="text-muted">Method</span><strong>${HH.esc(activeOrder.payment_method)}</strong></div>
+      <div class="flex justify-between"><span class="text-muted">Account Details</span><strong>${HH.esc(activeOrder.payment_id)}</strong></div>
+    </div>
+    <div class="modal__section-title">Proof</div>
+    <div class="link-list mb-16">
+      ${activeOrder.screenshot_url ? `<a href="${HH.esc(activeOrder.screenshot_url)}" target="_blank" rel="noopener">📄 Order Screenshot</a>` : ''}
+      ${hasDelivery ? `<a href="${HH.esc(activeOrder.delivery_screenshot_url)}" target="_blank" rel="noopener">📦 Delivery Photo</a>` : `<div class="err-box" style="margin:0;"><span class="err-box__icon">⏳</span><span>No delivery proof yet.</span></div>`}
+    </div>
+    <div class="modal__section-title">Update Status</div>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select id="omStatus" class="form-control">${HH.ORDER_STATUSES.map(function (s) { return `<option value="${HH.esc(s)}" ${s === activeOrder.status ? 'selected' : ''}>${HH.esc(s)}</option>`; }).join('')}</select>
+    </div>
+    <div class="form-group"><label class="form-label">Note to Buyer <span class="opt">(optional)</span></label><textarea id="omSellerNotes" class="form-control">${HH.esc(activeOrder.seller_notes || '')}</textarea></div>
+    <div class="form-group"><label class="form-label">Refund Proof URL</label><input type="text" id="omCashbackProofUrl" class="form-control" value="${HH.esc(activeOrder.cashback_proof_url || '')}"></div>
+  `;
+  document.getElementById('orderModalOverlay').classList.add('modal-overlay--visible');
+}
+
+document.getElementById('closeOrderModalBtn').addEventListener('click', closeOrderModal);
+document.getElementById('cancelOrderUpdateBtn').addEventListener('click', closeOrderModal);
+document.getElementById('orderModalOverlay').addEventListener('click', function (e) { if (e.target === this) closeOrderModal(); });
+function closeOrderModal() { document.getElementById('orderModalOverlay').classList.remove('modal-overlay--visible'); activeOrder = null; }
+
+document.getElementById('saveOrderUpdateBtn').addEventListener('click', async function () {
+  if (!activeOrder) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-spinner"></span> Saving…';
+
+  const result = await HH.post('updateOrderStatus', {
+    order_id: activeOrder.order_id,
+    status: document.getElementById('omStatus').value,
+    seller_notes: document.getElementById('omSellerNotes').value.trim(),
+    cashback_proof_url: document.getElementById('omCashbackProofUrl').value.trim(),
+    actor_id: 'admin', actor_type: 'admin'
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Save Changes';
+
+  if (!result.success) { HH.toast(result.error || 'Could not update order.', 'error'); return; }
+
+  HH.toast('Order updated!', 'success');
+  closeOrderModal();
+  loadAllOrders();
+});
+
+// ---------------------------------------------------------------- init
+document.addEventListener('DOMContentLoaded', async function () {
+  HH.mount();
+
+  const session = localStorage.getItem('hh_admin');
+  if (!session) { location.href = 'login.html'; return; }
+
+  const settingsResult = await HH.get('getSettings');
+  if (settingsResult.success && settingsResult.settings) HH.setCurrencySymbol(settingsResult.settings.currency_symbol);
+
+  switchView('dashboard');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller Dashboard — Happiness Hub</title>
+<link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<div class="mobile-topbar">
+  <div class="mobile-topbar__brand"><span style="font-size:20px;">💰</span> Happiness Hub</div>
+  <button class="mobile-topbar__menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+</div>
+
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__brand"><span style="font-size:20px;">💰</span> Happiness Hub</div>
+    <a href="#" class="sidebar__link active"><span class="ico">📊</span> Dashboard</a>
+    <a href="index.html" class="sidebar__link" target="_blank"><span class="ico">🛍️</span> View Storefront</a>
+    <div class="sidebar__footer">
+      <div class="text-muted mb-8" style="font-size:12px;" id="sellerNameDisplay"></div>
+      <button class="btn-ghost btn-sm btn-block" id="logoutBtn">Log Out</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Seller Dashboard</h1>
+        <p>Review proofs and process cashback for your orders.</p>
+      </div>
+    </div>
+
+    <div class="grid-stats mb-24" id="statCards">
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+    </div>
+
+    <div class="card mb-16">
+      <div class="flex gap-12 flex-wrap items-center">
+        <input type="search" id="searchInput" class="form-control" style="flex:1; min-width:200px;" placeholder="🔍 Search by buyer name, order ID…">
+        <select id="statusFilter" class="form-control" style="max-width:200px;">
+          <option value="">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Ordered">Ordered</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Cashback Sent">Cashback Sent</option>
+          <option value="Rejected">Rejected</option>
+          <option value="Need More Info">Need More Info</option>
+          <option value="PayPal Issue">PayPal Issue</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Order</th><th>Buyer</th><th>Refund Via</th><th>Amount</th><th>Delivery Proof</th><th>Status</th><th>Submitted</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="ordersTableBody">
+          <tr><td colspan="8"><div class="loading-row"><span class="btn-spinner"></span> Loading orders…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- ============================== UPDATE MODAL ============================== -->
+<div class="modal-overlay" id="updateModalOverlay">
+  <div class="modal modal--lg">
+    <div class="modal__header">
+      <div class="modal__title">Update Order</div>
+      <button class="modal__close" id="closeModalBtn" aria-label="Close">✕</button>
+    </div>
+    <div class="modal__body" id="modalBody"></div>
+    <div class="modal__footer">
+      <button class="btn-ghost" id="cancelUpdateBtn">Cancel</button>
+      <button class="btn-primary" id="saveUpdateBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="lib/hh.js"></script>
+<script>
+let session = null;
+let ordersCache = [];
+let currentSearch = '';
+let currentStatusFilter = '';
+let activeOrder = null;
+
+document.getElementById('menuBtn').addEventListener('click', function () {
+  document.getElementById('sidebar').classList.add('sidebar--open');
+  document.getElementById('sidebarOverlay').classList.add('sidebar-overlay--visible');
+});
+document.getElementById('sidebarOverlay').addEventListener('click', function () {
+  document.getElementById('sidebar').classList.remove('sidebar--open');
+  document.getElementById('sidebarOverlay').classList.remove('sidebar-overlay--visible');
+});
+document.getElementById('logoutBtn').addEventListener('click', function () {
+  HH.clearSession('seller');
+  location.href = 'seller-login.html';
+});
+
+function renderStats(stats) {
+  document.getElementById('statCards').innerHTML = `
+    <div class="stat-card"><div class="stat-card__label">📦 Total</div><div class="stat-card__value">${stats.total}</div></div>
+    <div class="stat-card stat-card--warn"><div class="stat-card__label">⏳ Pending</div><div class="stat-card__value">${stats.pending}</div></div>
+    <div class="stat-card"><div class="stat-card__label">🚚 Delivered</div><div class="stat-card__value">${stats.delivered}</div></div>
+    <div class="stat-card stat-card--accent"><div class="stat-card__label">💸 Cashback Sent</div><div class="stat-card__value">${stats.cashback_sent}</div></div>
+    <div class="stat-card stat-card--pink"><div class="stat-card__label">✕ Rejected</div><div class="stat-card__value">${stats.rejected}</div></div>`;
+  HH.staggerChildren(document.getElementById('statCards'), 0, 60);
+}
+
+function applyFiltersAndRender() {
+  let filtered = ordersCache;
+  if (currentStatusFilter) filtered = filtered.filter(function (o) { return String(o.status).trim() === currentStatusFilter; });
+  if (currentSearch) {
+    const q = currentSearch.toLowerCase();
+    filtered = filtered.filter(function (o) {
+      return [o.buyer_name, o.order_id, o.agent_id, o.product_title].some(function (f) {
+        return String(f || '').toLowerCase().indexOf(q) !== -1;
+      });
+    });
+  }
+  renderTable(filtered);
+}
+
+function renderTable(orders) {
+  const tbody = document.getElementById('ordersTableBody');
+  if (!orders.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state__icon">📭</div><div class="empty-state__title">No orders match</div><div class="empty-state__text">Try a different search or filter.</div></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = orders.map(function (o) {
+    const badge = HH.statusBadge(o.status);
+    const hasDelivery = String(o.delivery_screenshot_url || '').trim();
+    return `<tr>
+      <td><strong>${HH.esc(o.order_id)}</strong><div class="text-muted" style="font-size:11.5px;">${HH.esc(o.product_title || '')}</div></td>
+      <td>${HH.esc(o.buyer_name)}<div class="text-muted" style="font-size:11.5px;">${HH.esc(o.buyer_whatsapp)}</div></td>
+      <td>${HH.esc(o.payment_method || '—')}</td>
+      <td>${HH.fmt$(o.cashback_amount)}</td>
+      <td>${hasDelivery ? '<span class="badge badge--ok">📦 Yes</span>' : '<span class="badge badge--warn">⏳ No</span>'}</td>
+      <td><span class="badge ${badge.className}">${badge.icon} ${HH.esc(badge.label)}</span></td>
+      <td class="text-muted">${HH.esc(HH.timeAgo(o.submitted_at))}</td>
+      <td><button class="btn-ghost btn-sm open-update-btn" data-order-id="${HH.esc(o.order_id)}">Update</button></td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.open-update-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { openUpdateModal(btn.dataset.orderId); });
+  });
+}
+
+async function loadOrders() {
+  const auth = HH.getAuthBody('seller');
+  const result = await HH.get('getSellerOrders', { actor_id: auth.actor_id });
+  if (!result.success) {
+    document.getElementById('ordersTableBody').innerHTML = `<tr><td colspan="8"><div class="err-box"><span class="err-box__icon">⚠️</span><span>${HH.esc(result.error)}</span></div></td></tr>`;
+    return;
+  }
+  ordersCache = result.orders;
+  renderStats(result.stats);
+  applyFiltersAndRender();
+}
+
+document.getElementById('searchInput').addEventListener('input', function (e) {
+  currentSearch = e.target.value.trim();
+  applyFiltersAndRender();
+});
+document.getElementById('statusFilter').addEventListener('change', function (e) {
+  currentStatusFilter = e.target.value;
+  applyFiltersAndRender();
+});
+
+// ---------------------------------------------------------------- update modal
+function openUpdateModal(orderId) {
+  activeOrder = ordersCache.find(function (o) { return o.order_id === orderId; });
+  if (!activeOrder) return;
+
+  const hasDelivery = String(activeOrder.delivery_screenshot_url || '').trim();
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal__section-title">Buyer Information</div>
+    <div class="card mb-16">
+      <div class="flex justify-between mb-8"><span class="text-muted">Name</span><strong>${HH.esc(activeOrder.buyer_name)}</strong></div>
+      <div class="flex justify-between mb-8"><span class="text-muted">WhatsApp</span><strong>${HH.esc(activeOrder.buyer_whatsapp)}</strong></div>
+      <div class="flex justify-between mb-8"><span class="text-muted">Product</span><strong>${HH.esc(activeOrder.product_title)}</strong></div>
+      <div class="flex justify-between"><span class="text-muted">Store Order ID</span><strong>${HH.esc(activeOrder.amazon_order_id)}</strong></div>
+    </div>
+
+    <div class="modal__section-title">Refund Method</div>
+    <div class="card mb-16">
+      <div class="flex justify-between mb-8"><span class="text-muted">Method</span><strong>${HH.esc(activeOrder.payment_method)}</strong></div>
+      <div class="flex justify-between"><span class="text-muted">Account Details</span><strong>${HH.esc(activeOrder.payment_id)}</strong></div>
+    </div>
+
+    <div class="modal__section-title">Proof</div>
+    <div class="link-list mb-16">
+      ${activeOrder.screenshot_url ? `<a href="${HH.esc(activeOrder.screenshot_url)}" target="_blank" rel="noopener">📄 Order Screenshot</a>` : ''}
+      ${hasDelivery
+        ? `<a href="${HH.esc(activeOrder.delivery_screenshot_url)}" target="_blank" rel="noopener">📦 Delivery Photo</a>`
+        : `<div class="err-box" style="margin:0;"><span class="err-box__icon">⏳</span><span>No delivery proof yet — buyer hasn't confirmed delivery.</span></div>`}
+    </div>
+
+    <div class="modal__section-title">Update Status</div>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select id="modalStatus" class="form-control">
+        ${HH.ORDER_STATUSES.map(function (s) { return `<option value="${HH.esc(s)}" ${s === activeOrder.status ? 'selected' : ''}>${HH.esc(s)}</option>`; }).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Note to Buyer <span class="opt">(optional)</span></label>
+      <textarea id="modalSellerNotes" class="form-control" placeholder="Visible to the buyer in My Orders">${HH.esc(activeOrder.seller_notes || '')}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Refund Proof URL <span class="opt">(or upload below)</span></label>
+      <input type="text" id="modalCashbackProofUrl" class="form-control" placeholder="https://..." value="${HH.esc(activeOrder.cashback_proof_url || '')}">
+    </div>
+    <div class="upload-zone" id="modalUploadZone">
+      <div class="upload-zone__icon">💸</div>
+      <div class="upload-zone__text"><strong>Click to upload</strong> a refund screenshot<br>PNG or JPG, up to 5MB</div>
+      <input type="file" id="modalFileInput" accept="image/*">
+    </div>
+    <div id="modalUploadPreview"></div>
+  `;
+
+  const modalUploadZone = document.getElementById('modalUploadZone');
+  const modalFileInput = document.getElementById('modalFileInput');
+  modalUploadZone.addEventListener('click', function () { modalFileInput.click(); });
+  modalFileInput.addEventListener('change', async function (e) {
+    if (!e.target.files || !e.target.files.length) return;
+    const file = e.target.files[0];
+    if (file.size > 5 * 1024 * 1024) { HH.toast('That file is too large — please choose one under 5MB.', 'error'); return; }
+
+    document.getElementById('modalUploadPreview').innerHTML = `<div class="loading-row"><span class="btn-spinner"></span> Uploading…</div>`;
+    const result = await HH.uploadFile(file);
+    if (!result.success) { HH.toast(result.error || 'Upload failed.', 'error'); document.getElementById('modalUploadPreview').innerHTML = ''; return; }
+
+    document.getElementById('modalCashbackProofUrl').value = result.url;
+    document.getElementById('modalUploadPreview').innerHTML = `<div class="upload-preview"><img src="${result.url}"></div>`;
+    HH.toast('Refund screenshot uploaded!', 'success');
+  });
+
+  document.getElementById('updateModalOverlay').classList.add('modal-overlay--visible');
+}
+
+function closeUpdateModal() {
+  document.getElementById('updateModalOverlay').classList.remove('modal-overlay--visible');
+  activeOrder = null;
+}
+
+document.getElementById('closeModalBtn').addEventListener('click', closeUpdateModal);
+document.getElementById('cancelUpdateBtn').addEventListener('click', closeUpdateModal);
+document.getElementById('updateModalOverlay').addEventListener('click', function (e) {
+  if (e.target === this) closeUpdateModal();
+});
+
+document.getElementById('saveUpdateBtn').addEventListener('click', async function () {
+  if (!activeOrder) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-spinner"></span> Saving…';
+
+  const auth = HH.getAuthBody('seller');
+  const result = await HH.post('updateOrderStatus', {
+    order_id: activeOrder.order_id,
+    status: document.getElementById('modalStatus').value,
+    seller_notes: document.getElementById('modalSellerNotes').value.trim(),
+    cashback_proof_url: document.getElementById('modalCashbackProofUrl').value.trim(),
+    actor_id: auth.actor_id,
+    actor_type: 'seller'
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Save Changes';
+
+  if (!result.success) { HH.toast(result.error || 'Could not update order.', 'error'); return; }
+
+  HH.toast('Order updated!', 'success');
+  closeUpdateModal();
+  loadOrders();
+});
+
+document.addEventListener('DOMContentLoaded', async function () {
+  HH.mount();
+  session = HH.requireAuth('seller', 'seller-login.html');
+  if (!session) return;
+
+  document.getElementById('sellerNameDisplay').textContent = session.actor.name + ' · ' + (session.actor.store_name || session.actor.seller_id);
+
+  const settingsResult = await HH.get('getSettings');
+  if (settingsResult.success && settingsResult.settings) HH.setCurrencySymbol(settingsResult.settings.currency_symbol);
+
+  loadOrders();
+});
+</script>
+</body>
+</html>

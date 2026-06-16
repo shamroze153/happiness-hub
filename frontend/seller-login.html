@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller Login — Happiness Hub</title>
+<link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<nav class="topnav">
+  <div class="topnav__inner">
+    <a href="index.html" class="topnav__brand">
+      <div class="topnav__logo">💰</div>
+      <span>Happiness Hub</span>
+    </a>
+    <div class="topnav__links">
+      <a href="index.html">Home</a>
+      <a href="track.html">Track Order</a>
+      <a href="my-orders.html">My Orders</a>
+    </div>
+    <div class="topnav__actions">
+      <button class="topnav__menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+    </div>
+  </div>
+  <div class="topnav__mobile-menu" id="mobileMenu">
+    <a href="index.html">Home</a>
+    <a href="track.html">Track Order</a>
+    <a href="my-orders.html">My Orders</a>
+    <a href="agent-login.html">Agent Login</a>
+  </div>
+</nav>
+
+<section class="hero" style="padding-bottom:0;">
+  <div class="hero__orb hero__orb--1"></div>
+  <div class="hero__orb hero__orb--3"></div>
+  <div class="container hero__content">
+    <div class="eyebrow" style="justify-content:center;">Partner access</div>
+    <h1 class="gradient-text">Seller Login</h1>
+    <p>Sign in to review and process cashback orders for your store.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container" style="max-width:440px;">
+    <div class="card-glow slide-up">
+      <div class="form-group">
+        <label class="form-label">Seller ID</label>
+        <input type="text" id="sellerId" class="form-control" placeholder="e.g. SEL-XXXXXXXX" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="err-box hidden" id="loginError"><span class="err-box__icon">⚠️</span><span id="loginErrorText"></span></div>
+      <button class="btn-primary btn-block" id="loginBtn">Sign In →</button>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container"><p>© 2026 Happiness Hub · Buyer-friendly cashback, zero hassle.</p></div>
+</footer>
+
+<script src="lib/hh.js"></script>
+<script>
+const loginBtn = document.getElementById('loginBtn');
+const errBox = document.getElementById('loginError');
+const errText = document.getElementById('loginErrorText');
+
+async function login() {
+  const sellerId = document.getElementById('sellerId').value.trim();
+  const password = document.getElementById('password').value;
+
+  if (!sellerId || !password) {
+    errText.textContent = 'Please enter both your Seller ID and password.';
+    errBox.classList.remove('hidden');
+    return;
+  }
+
+  loginBtn.disabled = true;
+  loginBtn.innerHTML = '<span class="btn-spinner"></span> Signing in…';
+  errBox.classList.add('hidden');
+
+  const result = await HH.get('sellerLogin', { seller_id: sellerId, password: password });
+
+  loginBtn.disabled = false;
+  loginBtn.textContent = 'Sign In →';
+
+  if (!result.success) {
+    errText.textContent = result.error || 'Invalid seller ID or password.';
+    errBox.classList.remove('hidden');
+    return;
+  }
+
+  HH.setSession('seller', { token: result.token, actor: result.actor });
+  HH.toast('Welcome back, ' + result.actor.name + '!', 'success');
+  setTimeout(function () { location.href = 'seller-dashboard.html'; }, 400);
+}
+
+loginBtn.addEventListener('click', login);
+document.getElementById('password').addEventListener('keydown', function (e) { if (e.key === 'Enter') login(); });
+
+document.getElementById('menuBtn').addEventListener('click', function () {
+  document.getElementById('mobileMenu').classList.toggle('topnav__mobile-menu--open');
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  HH.mount();
+  if (HH.getSession('seller')) location.href = 'seller-dashboard.html';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Dashboard — Happiness Hub</title>
+<link rel="stylesheet" href="styles/main.css">
+<style>
+  .pm-card { cursor: pointer; padding: 16px 10px; text-align: center; transition: all .2s var(--ease); }
+  .pm-card:hover { border-color: var(--c-primary); transform: translateY(-2px); }
+  .pm-card--selected { border-color: var(--c-primary); background: var(--c-primary-soft); box-shadow: 0 0 0 2px var(--c-primary-soft); }
+  .pm-card__icon { font-size: 24px; margin-bottom: 6px; }
+  .pm-card__label { font-weight: 600; font-size: 13px; }
+  .pm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 18px; }
+  @media (max-width: 360px) { .pm-grid { grid-template-columns: 1fr; } }
+  .product-pick { display:flex; gap:12px; align-items:center; padding:12px; border-radius:var(--r-md); border:1px solid var(--c-border2); cursor:pointer; transition: all .2s var(--ease); }
+  .product-pick:hover { border-color: var(--c-primary); }
+  .product-pick--selected { border-color: var(--c-primary); background: var(--c-primary-soft); }
+  .product-pick img { width:48px; height:48px; border-radius:var(--r-sm); object-fit:cover; background:var(--c-surface); flex-shrink:0; }
+  .product-pick__title { font-weight:600; font-size:13.5px; }
+  .product-pick__meta { font-size:12px; color:var(--c-muted); }
+  .product-pick-list { display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto; margin-bottom:8px; }
+</style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<div class="mobile-topbar">
+  <div class="mobile-topbar__brand"><span style="font-size:20px;">💰</span> Happiness Hub</div>
+  <button class="mobile-topbar__menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+</div>
+
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__brand"><span style="font-size:20px;">💰</span> Happiness Hub</div>
+    <a href="#" class="sidebar__link active"><span class="ico">📊</span> Dashboard</a>
+    <a href="index.html" class="sidebar__link" target="_blank"><span class="ico">🛍️</span> View Storefront</a>
+    <div class="sidebar__footer">
+      <div class="text-muted mb-8" style="font-size:12px;" id="agentNameDisplay"></div>
+      <button class="btn-ghost btn-sm btn-block" id="logoutBtn">Log Out</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Agent Dashboard</h1>
+        <p>Track your referrals and submit orders on behalf of buyers.</p>
+      </div>
+    </div>
+
+    <div class="card mb-24">
+      <div class="form-label">Your Referral Link</div>
+      <div class="copy-link-row" id="refLinkText">Loading…</div>
+      <button class="btn-ghost btn-sm mt-16" id="copyRefBtn">📋 Copy Link</button>
+    </div>
+
+    <div class="grid-stats mb-24" id="statCards">
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab tab--active" data-tab="orders">My Orders</div>
+      <div class="tab" data-tab="submit">Submit Order</div>
+    </div>
+
+    <div id="tabOrders">
+      <div id="ordersList" class="flex-col gap-16">
+        <div class="loading-row"><span class="btn-spinner"></span> Loading orders…</div>
+      </div>
+    </div>
+
+    <div id="tabSubmit" class="hidden">
+      <div class="card-glow" style="max-width:560px;">
+        <div class="wiz-track" id="wizTrack">
+          <div class="wiz-step wiz-step--active"><div class="wiz-line"></div><div class="wiz-dot">1</div><div class="wiz-label">Product</div></div>
+          <div class="wiz-step"><div class="wiz-line"></div><div class="wiz-dot">2</div><div class="wiz-label">Buyer Info</div></div>
+          <div class="wiz-step"><div class="wiz-line"></div><div class="wiz-dot">3</div><div class="wiz-label">Refund Method</div></div>
+          <div class="wiz-step"><div class="wiz-line"></div><div class="wiz-dot">4</div><div class="wiz-label">Proof</div></div>
+        </div>
+
+        <!-- Step 1: Product -->
+        <div class="wiz-panel" data-step="1">
+          <label class="form-label">Select the product the buyer ordered</label>
+          <input type="search" id="productSearch" class="form-control mb-16" placeholder="🔍 Search products…">
+          <div class="product-pick-list" id="productPickList"></div>
+        </div>
+
+        <!-- Step 2: Buyer Info -->
+        <div class="wiz-panel hidden" data-step="2">
+          <div class="form-group">
+            <label class="form-label">Buyer's Name</label>
+            <input type="text" id="buyerName" class="form-control" placeholder="Full name">
+            <div class="form-error hidden" id="buyerNameError"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Buyer's WhatsApp Number</label>
+            <input type="tel" id="buyerWhatsapp" class="form-control" placeholder="e.g. +1 555 123 4567">
+            <div class="form-error hidden" id="buyerWhatsappError"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Order ID (from the store)</label>
+            <input type="text" id="amazonOrderId" class="form-control" placeholder="e.g. 112-3456789-1234567">
+            <div class="form-error hidden" id="amazonOrderIdError"></div>
+          </div>
+        </div>
+
+        <!-- Step 3: Refund Method -->
+        <div class="wiz-panel hidden" data-step="3">
+          <label class="form-label">Buyer's preferred refund method</label>
+          <div class="pm-grid" id="paymentMethodGrid"></div>
+          <div class="form-group hidden" id="accountDetailsGroup">
+            <label class="form-label" id="accountDetailsLabel">Account Details</label>
+            <input type="text" id="paymentId" class="form-control" placeholder="">
+            <div class="form-error hidden" id="paymentIdError"></div>
+          </div>
+        </div>
+
+        <!-- Step 4: Proof -->
+        <div class="wiz-panel hidden" data-step="4">
+          <label class="form-label">Upload the order confirmation screenshot</label>
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-zone__icon">📸</div>
+            <div class="upload-zone__text"><strong>Click to upload</strong> or drag and drop<br>PNG or JPG, up to 5MB</div>
+            <input type="file" id="fileInput" accept="image/*">
+          </div>
+          <div id="uploadPreview"></div>
+          <div class="form-group mt-16">
+            <label class="form-label">Notes <span class="opt">(optional)</span></label>
+            <textarea id="orderNotes" class="form-control" placeholder="Anything else worth noting?"></textarea>
+          </div>
+        </div>
+
+        <div class="wiz-nav">
+          <button class="btn-ghost hidden" id="backBtn" type="button">← Back</button>
+          <span></span>
+          <button class="btn-primary" id="nextBtn" type="button">Continue →</button>
+          <button class="btn-primary hidden" id="submitBtn" type="button">Submit Order</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="lib/hh.js"></script>
+<script>
+let session = null;
+let allProducts = [];
+let selectedProduct = null;
+let currentStep = 1;
+let selectedPaymentMethod = '';
+let selectedFile = null;
+
+// ---------------------------------------------------------------- sidebar / tabs
+document.getElementById('menuBtn').addEventListener('click', function () {
+  document.getElementById('sidebar').classList.add('sidebar--open');
+  document.getElementById('sidebarOverlay').classList.add('sidebar-overlay--visible');
+});
+document.getElementById('sidebarOverlay').addEventListener('click', function () {
+  document.getElementById('sidebar').classList.remove('sidebar--open');
+  document.getElementById('sidebarOverlay').classList.remove('sidebar-overlay--visible');
+});
+
+document.querySelectorAll('.tab').forEach(function (tab) {
+  tab.addEventListener('click', function () {
+    document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('tab--active'); });
+    tab.classList.add('tab--active');
+    document.getElementById('tabOrders').classList.toggle('hidden', tab.dataset.tab !== 'orders');
+    document.getElementById('tabSubmit').classList.toggle('hidden', tab.dataset.tab !== 'submit');
+    if (tab.dataset.tab === 'submit' && !allProducts.length) loadProducts();
+  });
+});
+
+document.getElementById('logoutBtn').addEventListener('click', function () {
+  HH.clearSession('agent');
+  location.href = 'agent-login.html';
+});
+
+// ---------------------------------------------------------------- stats / orders
+function renderStats(stats) {
+  document.getElementById('statCards').innerHTML = `
+    <div class="stat-card"><div class="stat-card__label">📦 Total</div><div class="stat-card__value">${stats.total}</div></div>
+    <div class="stat-card stat-card--warn"><div class="stat-card__label">⏳ Pending</div><div class="stat-card__value">${stats.pending}</div></div>
+    <div class="stat-card stat-card--accent"><div class="stat-card__label">✅ Completed</div><div class="stat-card__value">${stats.completed}</div></div>
+    <div class="stat-card stat-card--pink"><div class="stat-card__label">💸 Total Cashback</div><div class="stat-card__value">${HH.fmt$(stats.total_cashback)}</div></div>`;
+  HH.staggerChildren(document.getElementById('statCards'), 0, 70);
+}
+
+function needsDeliveryProof(order) {
+  const status = String(order.status).trim();
+  return (status === 'Pending' || status === 'Ordered') && !String(order.delivery_screenshot_url || '').trim();
+}
+
+function renderOrders(orders) {
+  const list = document.getElementById('ordersList');
+  if (!orders.length) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="empty-state__icon">📭</div>
+      <div class="empty-state__title">No orders yet</div>
+      <div class="empty-state__text">Orders you submit, or buyers who use your referral link, will show up here.</div>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = orders.map(function (order) {
+    let bannerHtml = '';
+    if (needsDeliveryProof(order)) {
+      bannerHtml = `<div class="action-banner">
+        <div class="action-banner__icon">📸</div>
+        <div class="action-banner__body">
+          <div class="action-banner__title">Action needed: Mark as Delivered</div>
+          <div class="action-banner__text">Upload a delivery photo to trigger cashback review.</div>
+        </div>
+        <button class="btn-primary btn-sm agent-upload-btn" data-order-id="${HH.esc(order.order_id)}" type="button">📤 Upload Delivery Photo</button>
+        <div class="mini-upload" id="miniUpload-${HH.esc(order.order_id)}" style="display:none; width:100%; margin-top:12px;">
+          <div class="upload-zone mini-upload-zone" data-order-id="${HH.esc(order.order_id)}">
+            <div class="upload-zone__icon">📦</div>
+            <div class="upload-zone__text"><strong>Click to upload</strong> a delivery photo<br>PNG or JPG, up to 5MB</div>
+            <input type="file" accept="image/*" class="mini-file-input" data-order-id="${HH.esc(order.order_id)}">
+          </div>
+          <div class="mini-preview" data-order-id="${HH.esc(order.order_id)}"></div>
+        </div>
+      </div>`;
+    }
+    return HH.renderOrderCard(order, { bannerHtml: bannerHtml });
+  }).join('');
+
+  HH.staggerChildren(list, 0, 70);
+  wireMiniUploadHandlers();
+}
+
+function wireMiniUploadHandlers() {
+  document.querySelectorAll('.agent-upload-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const el = document.getElementById('miniUpload-' + btn.dataset.orderId);
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+  document.querySelectorAll('.mini-upload-zone').forEach(function (zone) {
+    const orderId = zone.dataset.orderId;
+    const input = zone.querySelector('.mini-file-input');
+    zone.addEventListener('click', function () { input.click(); });
+  });
+  document.querySelectorAll('.mini-file-input').forEach(function (input) {
+    input.addEventListener('change', function (e) {
+      if (e.target.files && e.target.files.length) handleMiniFile(input.dataset.orderId, e.target.files[0]);
+    });
+  });
+}
+
+async function handleMiniFile(orderId, file) {
+  if (file.size > 5 * 1024 * 1024) { HH.toast('That file is too large — please choose one under 5MB.', 'error'); return; }
+  const previewEl = document.querySelector('.mini-preview[data-order-id="' + orderId + '"]');
+  previewEl.innerHTML = `<div class="loading-row"><span class="btn-spinner"></span> Uploading…</div>`;
+
+  const uploadResult = await HH.uploadFile(file);
+  if (!uploadResult.success) { HH.toast(uploadResult.error || 'Upload failed.', 'error'); previewEl.innerHTML = ''; return; }
+
+  const result = await HH.post('submitDeliveryProof', { order_id: orderId, delivery_screenshot_url: uploadResult.url });
+  if (!result.success) { HH.toast(result.error || 'Could not save delivery proof.', 'error'); previewEl.innerHTML = ''; return; }
+
+  HH.toast('Delivery proof received!', 'success');
+  loadOrders();
+}
+
+async function loadOrders() {
+  const auth = HH.getAuthBody('agent');
+  const result = await HH.get('getAgentOrders', { actor_id: auth.actor_id });
+  if (!result.success) {
+    document.getElementById('ordersList').innerHTML = `<div class="err-box"><span class="err-box__icon">⚠️</span><span>${HH.esc(result.error)}</span></div>`;
+    return;
+  }
+  renderStats(result.stats);
+  renderOrders(result.orders);
+}
+
+// ---------------------------------------------------------------- product picker
+async function loadProducts() {
+  document.getElementById('productPickList').innerHTML = `<div class="loading-row"><span class="btn-spinner"></span> Loading products…</div>`;
+  const result = await HH.get('getProducts', {});
+  if (!result.success) {
+    document.getElementById('productPickList').innerHTML = `<div class="err-box"><span class="err-box__icon">⚠️</span><span>${HH.esc(result.error)}</span></div>`;
+    return;
+  }
+  allProducts = result.products;
+  renderProductPickList(allProducts);
+}
+
+function renderProductPickList(products) {
+  const list = document.getElementById('productPickList');
+  if (!products.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state__text">No products found.</div></div>`;
+    return;
+  }
+  list.innerHTML = products.map(function (p) {
+    const img = p.image_url && String(p.image_url).trim() ? p.image_url : '';
+    return `<div class="product-pick" data-id="${HH.esc(p.product_id)}">
+      <img src="${HH.esc(img)}" onerror="this.style.visibility='hidden'">
+      <div>
+        <div class="product-pick__title">${HH.esc(p.title)}</div>
+        <div class="product-pick__meta">${HH.fmt$(p.cashback_amount)} cashback · ${HH.esc(p.category || 'General')}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.product-pick').forEach(function (el) {
+    el.addEventListener('click', function () {
+      list.querySelectorAll('.product-pick').forEach(function (e) { e.classList.remove('product-pick--selected'); });
+      el.classList.add('product-pick--selected');
+      selectedProduct = allProducts.find(function (p) { return p.product_id === el.dataset.id; });
+    });
+  });
+}
+
+document.getElementById('productSearch').addEventListener('input', function (e) {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) { renderProductPickList(allProducts); return; }
+  renderProductPickList(allProducts.filter(function (p) {
+    return String(p.title).toLowerCase().indexOf(q) !== -1 || String(p.category || '').toLowerCase().indexOf(q) !== -1;
+  }));
+});
+
+// ---------------------------------------------------------------- payment methods
+function renderPaymentMethods() {
+  const grid = document.getElementById('paymentMethodGrid');
+  grid.innerHTML = HH.PAYMENT_METHODS.map(function (m) {
+    return `<div class="card pm-card" data-method="${HH.esc(m.value)}" data-placeholder="${HH.esc(m.placeholder)}" data-label="${HH.esc(m.label)}">
+      <div class="pm-card__icon">${m.icon}</div>
+      <div class="pm-card__label">${HH.esc(m.label)}</div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.pm-card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      grid.querySelectorAll('.pm-card').forEach(function (c) { c.classList.remove('pm-card--selected'); });
+      card.classList.add('pm-card--selected');
+      selectedPaymentMethod = card.dataset.method;
+      document.getElementById('accountDetailsGroup').classList.remove('hidden');
+      document.getElementById('accountDetailsLabel').textContent = 'Buyer\'s ' + card.dataset.label + ' Details';
+      const input = document.getElementById('paymentId');
+      input.placeholder = card.dataset.placeholder;
+      input.focus();
+    });
+  });
+}
+renderPaymentMethods();
+
+// ---------------------------------------------------------------- wizard nav
+function updateWizTrack() {
+  document.querySelectorAll('#wizTrack .wiz-step').forEach(function (el, i) {
+    const stepNum = i + 1;
+    el.classList.remove('wiz-step--done', 'wiz-step--active');
+    if (stepNum < currentStep) el.classList.add('wiz-step--done');
+    else if (stepNum === currentStep) el.classList.add('wiz-step--active');
+  });
+}
+
+function goToStep(step) {
+  currentStep = step;
+  document.querySelectorAll('#tabSubmit .wiz-panel').forEach(function (panel) {
+    panel.classList.toggle('hidden', parseInt(panel.dataset.step, 10) !== step);
+  });
+  updateWizTrack();
+  document.getElementById('backBtn').classList.toggle('hidden', step === 1);
+  document.getElementById('nextBtn').classList.toggle('hidden', step === 4);
+  document.getElementById('submitBtn').classList.toggle('hidden', step !== 4);
+}
+
+function clearErrors() {
+  document.querySelectorAll('#tabSubmit .form-error').forEach(function (el) { el.textContent = ''; el.classList.add('hidden'); });
+  document.querySelectorAll('#tabSubmit .form-control').forEach(function (el) { el.style.borderColor = ''; });
+}
+
+function showError(fieldId, msg) {
+  const el = document.getElementById(fieldId + 'Error');
+  const input = document.getElementById(fieldId);
+  if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+  if (input) input.style.borderColor = '#ff4f67';
+}
+
+function validateStep(step) {
+  clearErrors();
+  if (step === 1) {
+    if (!selectedProduct) { HH.toast('Please select a product.', 'error'); return false; }
+    return true;
+  }
+  if (step === 2) {
+    let ok = true;
+    const name = document.getElementById('buyerName').value.trim();
+    const wa = document.getElementById('buyerWhatsapp').value.trim();
+    const orderId = document.getElementById('amazonOrderId').value.trim();
+    if (!name) { showError('buyerName', 'Please enter the buyer\'s name.'); ok = false; }
+    if (!wa) { showError('buyerWhatsapp', 'Please enter the buyer\'s WhatsApp number.'); ok = false; }
+    if (!orderId) { showError('amazonOrderId', 'Please enter the order ID.'); ok = false; }
+    return ok;
+  }
+  if (step === 3) {
+    if (!selectedPaymentMethod) { HH.toast('Please select a refund method.', 'error'); return false; }
+    const paymentId = document.getElementById('paymentId').value.trim();
+    if (!paymentId) { showError('paymentId', 'Please enter the account details.'); return false; }
+    return true;
+  }
+  return true;
+}
+
+document.getElementById('nextBtn').addEventListener('click', function () {
+  if (!validateStep(currentStep)) return;
+  goToStep(currentStep + 1);
+});
+document.getElementById('backBtn').addEventListener('click', function () {
+  clearErrors();
+  goToStep(currentStep - 1);
+});
+
+// ---------------------------------------------------------------- upload
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+uploadZone.addEventListener('click', function () { fileInput.click(); });
+uploadZone.addEventListener('dragover', function (e) { e.preventDefault(); uploadZone.classList.add('upload-zone--drag'); });
+uploadZone.addEventListener('dragleave', function () { uploadZone.classList.remove('upload-zone--drag'); });
+uploadZone.addEventListener('drop', function (e) {
+  e.preventDefault();
+  uploadZone.classList.remove('upload-zone--drag');
+  if (e.dataTransfer.files && e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', function (e) {
+  if (e.target.files && e.target.files.length) handleFile(e.target.files[0]);
+});
+
+function handleFile(file) {
+  if (!file.type || file.type.indexOf('image/') !== 0) { HH.toast('Please choose an image file.', 'error'); return; }
+  if (file.size > 5 * 1024 * 1024) { HH.toast('That file is too large — please choose one under 5MB.', 'error'); return; }
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    document.getElementById('uploadPreview').innerHTML = `<div class="upload-preview"><img src="${e.target.result}"><button class="upload-preview__remove" id="removePreview" type="button">✕</button></div>`;
+    document.getElementById('removePreview').addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      selectedFile = null;
+      document.getElementById('uploadPreview').innerHTML = '';
+      fileInput.value = '';
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+// ---------------------------------------------------------------- submit
+document.getElementById('submitBtn').addEventListener('click', async function () {
+  if (!selectedFile) { HH.toast('Please upload the order confirmation screenshot.', 'error'); return; }
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  document.getElementById('backBtn').disabled = true;
+  submitBtn.innerHTML = '<span class="btn-spinner"></span> Uploading photo…';
+
+  const uploadResult = await HH.uploadFile(selectedFile);
+  if (!uploadResult.success) {
+    HH.toast(uploadResult.error || 'Upload failed.', 'error');
+    submitBtn.disabled = false; document.getElementById('backBtn').disabled = false;
+    submitBtn.textContent = 'Submit Order';
+    return;
+  }
+
+  submitBtn.innerHTML = '<span class="btn-spinner"></span> Submitting order…';
+  const auth = HH.getAuthBody('agent');
+
+  const result = await HH.post('submitOrder', {
+    buyer_name: document.getElementById('buyerName').value.trim(),
+    buyer_whatsapp: document.getElementById('buyerWhatsapp').value.trim(),
+    product_id: selectedProduct.product_id,
+    amazon_order_id: document.getElementById('amazonOrderId').value.trim(),
+    screenshot_url: uploadResult.url,
+    payment_method: selectedPaymentMethod,
+    payment_id: document.getElementById('paymentId').value.trim(),
+    notes: document.getElementById('orderNotes').value.trim(),
+    agent_id: auth.actor_id
+  });
+
+  submitBtn.disabled = false;
+  document.getElementById('backBtn').disabled = false;
+  submitBtn.textContent = 'Submit Order';
+
+  if (!result.success) {
+    HH.toast(result.error || 'Could not submit order.', 'error');
+    return;
+  }
+
+  HH.toast('Order ' + result.order_id + ' submitted!', 'success');
+
+  // Reset wizard state and switch back to the orders tab.
+  selectedProduct = null;
+  selectedPaymentMethod = '';
+  selectedFile = null;
+  document.getElementById('buyerName').value = '';
+  document.getElementById('buyerWhatsapp').value = '';
+  document.getElementById('amazonOrderId').value = '';
+  document.getElementById('paymentId').value = '';
+  document.getElementById('orderNotes').value = '';
+  document.getElementById('uploadPreview').innerHTML = '';
+  document.getElementById('accountDetailsGroup').classList.add('hidden');
+  document.querySelectorAll('.pm-card').forEach(function (c) { c.classList.remove('pm-card--selected'); });
+  document.querySelectorAll('.product-pick').forEach(function (c) { c.classList.remove('product-pick--selected'); });
+  goToStep(1);
+
+  document.querySelector('.tab[data-tab="orders"]').click();
+  loadOrders();
+});
+
+// ---------------------------------------------------------------- init
+document.getElementById('copyRefBtn').addEventListener('click', function () {
+  const text = document.getElementById('refLinkText').textContent;
+  navigator.clipboard.writeText(text).then(function () {
+    HH.toast('Referral link copied!', 'success');
+  }).catch(function () {
+    HH.toast('Could not copy automatically — please copy it manually.', 'error');
+  });
+});
+
+document.addEventListener('DOMContentLoaded', async function () {
+  HH.mount();
+  session = HH.requireAuth('agent', 'agent-login.html');
+  if (!session) return;
+
+  document.getElementById('agentNameDisplay').textContent = session.actor.name + ' · ' + session.actor.agent_id;
+  document.getElementById('refLinkText').textContent = location.origin + location.pathname.replace('agent-dashboard.html', 'index.html') + '?ref=' + session.actor.agent_id;
+
+  const settingsResult = await HH.get('getSettings');
+  if (settingsResult.success && settingsResult.settings) HH.setCurrencySymbol(settingsResult.settings.currency_symbol);
+
+  loadOrders();
+});
+</script>
+</body>
+</html>
