@@ -21,7 +21,7 @@
   // CONFIG
   // ----------------------------------------------------------------------------
   // If you ever rotate the Apps Script deployment URL, update ONLY this constant.
-  const API = 'https://script.google.com/macros/s/AKfycbxBXKTFxGZREvg2gCTyeOSXyrtsJWORFSOuc7cVRxkRPTdNT6fqDpX5dZC4J51JC74/exec';
+  const API = 'https://script.google.com/macros/s/AKfycbwsbF1M-EGPz-goxVS0-Z0PcVKNrZNgV6FDb8XeWycvkebiVYX9ztWq5Uh-eEQkZWgw/exec8';
 
   const PAYMENT_METHODS = [
     { value: 'Zelle', label: 'Zelle', icon: '🏦', placeholder: 'Email or phone number used for Zelle' },
