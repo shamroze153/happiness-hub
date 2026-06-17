@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Orders Login — Happiness Hub</title>
+<link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<nav class="topnav">
+  <div class="topnav__inner">
+    <a href="index.html" class="topnav__brand">
+      <div class="topnav__logo">💰</div>
+      <span>Happiness Hub</span>
+    </a>
+    <div class="topnav__links">
+      <a href="index.html">Home</a>
+      <a href="track.html">Track Order</a>
+      <a href="my-orders.html" class="active">My Orders</a>
+    </div>
+    <div class="topnav__actions">
+      <button class="topnav__menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+    </div>
+  </div>
+  <div class="topnav__mobile-menu" id="mobileMenu">
+    <a href="index.html">Home</a>
+    <a href="track.html">Track Order</a>
+    <a href="my-orders.html" class="active">My Orders</a>
+    <a href="agent-login.html">Agent Login</a>
+    <a href="admin/login.html">Admin Login</a>
+  </div>
+</nav>
+
+<section class="hero" style="padding-bottom:0;">
+  <div class="hero__orb hero__orb--1"></div>
+  <div class="hero__orb hero__orb--3"></div>
+  <div class="container hero__content">
+    <div class="eyebrow" style="justify-content:center;">No password needed</div>
+    <h1 class="gradient-text">My Orders</h1>
+    <p>Enter the email you used when ordering to see your full history.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container" style="max-width:480px;">
+    <div class="card-glow slide-up">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" id="emailInput" class="form-control" placeholder="you@example.com" autocomplete="email">
+        <div class="form-error hidden" id="emailError"></div>
+      </div>
+      <button class="btn-primary btn-block" id="continueBtn">Continue →</button>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container"><p>© 2026 Happiness Hub · Buyer-friendly cashback, zero hassle.</p></div>
+</footer>
+
+<script src="lib/hh.js"></script>
+<script>
+const input = document.getElementById('emailInput');
+const btn = document.getElementById('continueBtn');
+const errEl = document.getElementById('emailError');
+
+function go() {
+  const email = input.value.trim();
+  if (!email) {
+    errEl.textContent = 'Please enter your email.';
+    errEl.classList.remove('hidden');
+    input.style.borderColor = '#ff4f67';
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = 'That doesn\'t look like a valid email — please double-check it.';
+    errEl.classList.remove('hidden');
+    input.style.borderColor = '#ff4f67';
+    return;
+  }
+  localStorage.setItem('hh_buyer_email', email);
+  location.href = 'my-orders.html';
+}
+
+btn.addEventListener('click', go);
+input.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+input.addEventListener('input', function () {
+  errEl.classList.add('hidden');
+  input.style.borderColor = '';
+});
+
+document.getElementById('menuBtn').addEventListener('click', function () {
+  document.getElementById('mobileMenu').classList.toggle('topnav__mobile-menu--open');
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  HH.mount();
+  const existing = localStorage.getItem('hh_buyer_email');
+  if (existing) location.href = 'my-orders.html';
+});
+</script>
+</body>
+</html>
