@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Happiness Hub — Cash Back On Everything You Buy</title>
+<meta name="description" content="Shop your favorite products through our links, submit proof of purchase, and get real cash back — fully self-serve, no account needed.">
+<link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<!-- ============================== NAV ============================== -->
+<nav class="topnav">
+  <div class="topnav__inner">
+    <a href="index.html" class="topnav__brand">
+      <div class="topnav__logo">💰</div>
+      <span>Happiness Hub</span>
+    </a>
+    <div class="topnav__links">
+      <a href="index.html" class="active">Home</a>
+      <a href="track.html">Track Order</a>
+      <a href="my-orders.html">My Orders</a>
+    </div>
+    <div class="topnav__actions">
+      <a href="my-orders.html" class="btn-ghost btn-sm">My Orders</a>
+      <button class="topnav__menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+    </div>
+  </div>
+  <div class="topnav__mobile-menu" id="mobileMenu">
+    <a href="index.html" class="active">Home</a>
+    <a href="track.html">Track Order</a>
+    <a href="my-orders.html">My Orders</a>
+    <a href="agent-login.html">Agent Login</a>
+    <a href="seller-login.html">Seller Login</a>
+  </div>
+</nav>
+
+<!-- ============================== HERO ============================== -->
+<section class="hero">
+  <div class="hero__orb hero__orb--1"></div>
+  <div class="hero__orb hero__orb--2"></div>
+  <div class="hero__orb hero__orb--3"></div>
+  <div class="container hero__content">
+    <div class="eyebrow" style="justify-content:center;">No account needed</div>
+    <h1 class="gradient-text" id="heroTitle">Shop. Snap a proof. Get cash back.</h1>
+    <p id="heroSubtitle">Buy the products you already want through our links, upload your receipt, and we send real money back to your Zelle, Cash App, Venmo, or PayPal.</p>
+
+    <div class="hero__actions">
+      <a href="#products" class="btn-primary">Browse Deals</a>
+      <a href="track.html" class="btn-ghost">Track an Order</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== PRODUCTS ============================== -->
+<section class="section" id="products">
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h2>Active Cashback Deals</h2>
+        <p class="text-muted" id="resultCount">Loading deals…</p>
+      </div>
+      <div style="min-width:240px; flex:1; max-width:360px;">
+        <input type="search" id="searchInput" class="form-control" placeholder="🔍 Search products…">
+      </div>
+    </div>
+
+    <div class="chips mb-24" id="categoryChips">
+      <button class="chip chip--active" data-cat="">All</button>
+    </div>
+
+    <div id="productGrid" class="grid-cards">
+      <!-- skeleton / products injected here -->
+    </div>
+  </div>
+</section>
+
+<!-- ============================== FOOTER ============================== -->
+<footer class="site-footer">
+  <div class="container">
+    <p>© 2026 Happiness Hub · Buyer-friendly cashback, zero hassle.</p>
+    <p class="mt-8" style="font-size:12px;">
+      <a href="track.html">Track Order</a> ·
+      <a href="my-orders.html">My Orders</a> ·
+      <a href="agent-login.html">Agent Login</a> ·
+      <a href="seller-login.html">Seller Login</a>
+    </p>
+  </div>
+</footer>
+
+<script src="lib/hh.js"></script>
+<script>
+let allCategories = [];
+let currentCategory = '';
+let currentQuery = '';
+let searchTimer = null;
+
+const grid = document.getElementById('productGrid');
+const resultCount = document.getElementById('resultCount');
+const chipsEl = document.getElementById('categoryChips');
+
+function skeletonGrid(n) {
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    html += `<div class="card" style="padding:0; overflow:hidden;">
+      <div class="skeleton" style="aspect-ratio:4/3;"></div>
+      <div style="padding:16px;">
+        <div class="skeleton" style="height:11px; width:40%; margin-bottom:10px; border-radius:4px;"></div>
+        <div class="skeleton" style="height:16px; width:90%; margin-bottom:8px; border-radius:4px;"></div>
+        <div class="skeleton" style="height:16px; width:60%; border-radius:4px;"></div>
+      </div>
+    </div>`;
+  }
+  return html;
+}
+
+function renderCategories(categories) {
+  allCategories = categories;
+  let html = `<button class="chip ${currentCategory === '' ? 'chip--active' : ''}" data-cat="">All</button>`;
+  categories.forEach(function (c) {
+    html += `<button class="chip ${currentCategory === c ? 'chip--active' : ''}" data-cat="${HH.esc(c)}">${HH.esc(c)}</button>`;
+  });
+  chipsEl.innerHTML = html;
+
+  chipsEl.querySelectorAll('.chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      chipsEl.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('chip--active'); });
+      chip.classList.add('chip--active');
+      currentCategory = chip.dataset.cat;
+      loadProducts();
+    });
+  });
+}
+
+function renderProducts(products) {
+  if (!products.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">
+      <div class="empty-state__icon">🔎</div>
+      <div class="empty-state__title">No deals found</div>
+      <div class="empty-state__text">Try a different search term or category — or check back soon for new drops.</div>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = products.map(function (p) {
+    const stock = HH.stockBadge(p.stock_status);
+    const featured = String(p.featured).trim().toUpperCase() === 'TRUE';
+    const img = p.image_url && String(p.image_url).trim()
+      ? p.image_url
+      : 'https://images.weserv.nl/?url=&w=400&h=300&bg=13131f';
+    return `
+      <a href="product.html?id=${encodeURIComponent(p.product_id)}" class="product-card">
+        <div class="product-card__media">
+          <img src="${HH.esc(img)}" alt="${HH.esc(p.title)}" loading="lazy"
+               onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22%3E%3Crect width=%22400%22 height=%22300%22 fill=%22%2313131f%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%236b6892%22 font-size=%2218%22 text-anchor=%22middle%22 dy=%22.3em%22%3ENo Image%3C/text%3E%3C/svg%3E';">
+          ${featured ? '<div class="product-card__badge">⭐ Featured</div>' : ''}
+          <div class="product-card__cashback">${HH.fmt$(p.cashback_amount)} back</div>
+        </div>
+        <div class="product-card__body">
+          <div class="product-card__cat">${HH.esc(p.category || 'General')}</div>
+          <div class="product-card__title">${HH.esc(p.title)}</div>
+          <div class="product-card__footer">
+            <span class="product-card__sold">${p.sold_by ? 'by ' + HH.esc(p.sold_by) : ''}</span>
+            <span class="badge ${stock.className}">${stock.icon} ${HH.esc(stock.label)}</span>
+          </div>
+        </div>
+      </a>
+    `;
+  }).join('');
+
+  HH.staggerChildren(grid, 0, 50);
+}
+
+async function loadProducts() {
+  grid.innerHTML = skeletonGrid(8);
+  resultCount.textContent = 'Loading deals…';
+
+  const result = await HH.get('getProducts', { category: currentCategory, q: currentQuery });
+
+  if (!result.success) {
+    grid.innerHTML = `<div class="err-box" style="grid-column:1/-1;">
+      <span class="err-box__icon">⚠️</span>
+      <span>${HH.esc(result.error || 'Could not load products. Please refresh the page.')}</span>
+    </div>`;
+    resultCount.textContent = '';
+    return;
+  }
+
+  if (!allCategories.length || JSON.stringify(allCategories) !== JSON.stringify(result.categories)) {
+    renderCategories(result.categories);
+  }
+
+  resultCount.textContent = result.total + (result.total === 1 ? ' deal available' : ' deals available');
+  renderProducts(result.products);
+}
+
+async function loadSettings() {
+  const result = await HH.get('getSettings');
+  if (result.success && result.settings) {
+    if (result.settings.hero_title) document.getElementById('heroTitle').textContent = result.settings.hero_title;
+    if (result.settings.hero_subtitle) document.getElementById('heroSubtitle').textContent = result.settings.hero_subtitle;
+    if (result.settings.site_name) document.title = result.settings.site_name + ' — Cash Back On Everything You Buy';
+    HH.setCurrencySymbol(result.settings.currency_symbol);
+  }
+}
+
+document.getElementById('searchInput').addEventListener('input', function (e) {
+  clearTimeout(searchTimer);
+  const val = e.target.value;
+  searchTimer = setTimeout(function () {
+    currentQuery = val.trim();
+    loadProducts();
+  }, 350);
+});
+
+document.getElementById('menuBtn').addEventListener('click', function () {
+  document.getElementById('mobileMenu').classList.toggle('topnav__mobile-menu--open');
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  HH.mount();
+  loadSettings();
+  loadProducts();
+});
+</script>
+</body>
+</html>
