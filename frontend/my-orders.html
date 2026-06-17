@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Orders — Happiness Hub</title>
+<link rel="stylesheet" href="styles/main.css">
+<style>
+  .mini-upload { display:none; }
+  .mini-upload--open { display:block; }
+</style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<nav class="topnav">
+  <div class="topnav__inner">
+    <a href="index.html" class="topnav__brand">
+      <div class="topnav__logo">💰</div>
+      <span>Happiness Hub</span>
+    </a>
+    <div class="topnav__links">
+      <a href="index.html">Home</a>
+      <a href="track.html">Track Order</a>
+      <a href="my-orders.html" class="active">My Orders</a>
+    </div>
+    <div class="topnav__actions">
+      <button class="btn-ghost btn-sm" id="switchNumberBtn">Switch Number</button>
+      <button class="topnav__menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+    </div>
+  </div>
+  <div class="topnav__mobile-menu" id="mobileMenu">
+    <a href="index.html">Home</a>
+    <a href="track.html">Track Order</a>
+    <a href="my-orders.html" class="active">My Orders</a>
+    <a href="agent-login.html">Agent Login</a>
+    <a href="admin/login.html">Admin Login</a>
+  </div>
+</nav>
+
+<section class="section">
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1>My Orders</h1>
+        <p id="welcomeText">Loading your orders…</p>
+      </div>
+    </div>
+
+    <div class="grid-stats mb-24" id="statCards">
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+      <div class="stat-card"><div class="skeleton" style="height:34px;"></div></div>
+    </div>
+
+    <div id="needsProofBanner"></div>
+
+    <div id="ordersList" class="flex-col gap-16">
+      <div class="loading-row"><span class="btn-spinner"></span> Loading orders…</div>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container"><p>© 2026 Happiness Hub · Buyer-friendly cashback, zero hassle.</p></div>
+</footer>
+
+<script src="lib/hh.js"></script>
+<script>
+let buyerWa = '';
+let ordersCache = [];
+
+function renderStats(stats) {
+  document.getElementById('statCards').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-card__label">📦 Total Orders</div>
+      <div class="stat-card__value">${stats.total}</div>
+    </div>
+    <div class="stat-card stat-card--warn">
+      <div class="stat-card__label">⏳ In Progress</div>
+      <div class="stat-card__value">${stats.in_progress}</div>
+    </div>
+    <div class="stat-card stat-card--accent">
+      <div class="stat-card__label">💸 Cashback Received</div>
+      <div class="stat-card__value">${stats.cashback_received}</div>
+    </div>`;
+  HH.staggerChildren(document.getElementById('statCards'), 0, 70);
+}
+
+function renderNeedsProofBanner(count) {
+  const el = document.getElementById('needsProofBanner');
+  if (!count) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="action-banner slide-up">
+    <div class="action-banner__icon">📸</div>
+    <div class="action-banner__body">
+      <div class="action-banner__title">${count} order${count > 1 ? 's' : ''} need${count > 1 ? '' : 's'} a delivery photo</div>
+      <div class="action-banner__text">Scroll down and upload a delivery photo for each — that's how we know to send your cashback.</div>
+    </div>
+  </div>`;
+}
+
+function needsDeliveryProof(order) {
+  const status = String(order.status).trim();
+  return (status === 'Pending' || status === 'Ordered') && !String(order.delivery_screenshot_url || '').trim();
+}
+
+function renderOrders(orders) {
+  const list = document.getElementById('ordersList');
+
+  if (!orders.length) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="empty-state__icon">🛍️</div>
+      <div class="empty-state__title">No orders yet</div>
+      <div class="empty-state__text">Once you submit your first order, it'll show up here.</div>
+      <a href="index.html" class="btn-primary mt-16" style="display:inline-flex;">Browse Deals</a>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = orders.map(function (order) {
+    let bannerHtml = '';
+    if (needsDeliveryProof(order)) {
+      bannerHtml = `
+        <div class="action-banner">
+          <div class="action-banner__icon">📸</div>
+          <div class="action-banner__body">
+            <div class="action-banner__title">Action needed: Mark as Delivered</div>
+            <div class="action-banner__text">Upload a photo of the delivered item to trigger your cashback review.</div>
+          </div>
+          <button class="btn-primary btn-sm action-banner__upload-btn" data-order-id="${HH.esc(order.order_id)}" type="button">📤 Upload Delivery Photo</button>
+          <div class="mini-upload action-banner__upload" id="miniUpload-${HH.esc(order.order_id)}">
+            <div class="upload-zone mini-upload-zone" data-order-id="${HH.esc(order.order_id)}">
+              <div class="upload-zone__icon">📦</div>
+              <div class="upload-zone__text"><strong>Click to upload</strong> a delivery photo<br>PNG or JPG, up to 5MB</div>
+              <input type="file" accept="image/*" class="mini-file-input" data-order-id="${HH.esc(order.order_id)}">
+            </div>
+            <div class="mini-preview" data-order-id="${HH.esc(order.order_id)}"></div>
+          </div>
+        </div>`;
+    }
+    return HH.renderOrderCard(order, { bannerHtml: bannerHtml });
+  }).join('');
+
+  HH.staggerChildren(list, 0, 70);
+  wireUploadHandlers();
+}
+
+function wireUploadHandlers() {
+  document.querySelectorAll('.action-banner__upload-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const id = btn.dataset.orderId;
+      document.getElementById('miniUpload-' + id).classList.toggle('mini-upload--open');
+    });
+  });
+
+  document.querySelectorAll('.mini-upload-zone').forEach(function (zone) {
+    const orderId = zone.dataset.orderId;
+    const input = zone.querySelector('.mini-file-input');
+    zone.addEventListener('click', function () { input.click(); });
+    zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('upload-zone--drag'); });
+    zone.addEventListener('dragleave', function () { zone.classList.remove('upload-zone--drag'); });
+    zone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      zone.classList.remove('upload-zone--drag');
+      if (e.dataTransfer.files && e.dataTransfer.files.length) handleMiniFile(orderId, e.dataTransfer.files[0]);
+    });
+  });
+
+  document.querySelectorAll('.mini-file-input').forEach(function (input) {
+    input.addEventListener('change', function (e) {
+      if (e.target.files && e.target.files.length) handleMiniFile(input.dataset.orderId, e.target.files[0]);
+    });
+  });
+}
+
+async function handleMiniFile(orderId, file) {
+  if (!file.type || file.type.indexOf('image/') !== 0) {
+    HH.toast('Please choose an image file.', 'error');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    HH.toast('That file is too large — please choose one under 5MB.', 'error');
+    return;
+  }
+
+  const previewEl = document.querySelector('.mini-preview[data-order-id="' + orderId + '"]');
+  previewEl.innerHTML = `<div class="loading-row"><span class="btn-spinner"></span> Uploading…</div>`;
+
+  const uploadResult = await HH.uploadFile(file);
+  if (!uploadResult.success) {
+    HH.toast(uploadResult.error || 'Upload failed. Please try again.', 'error');
+    previewEl.innerHTML = '';
+    return;
+  }
+
+  const result = await HH.post('submitDeliveryProof', {
+    order_id: orderId,
+    delivery_screenshot_url: uploadResult.url
+  });
+
+  if (!result.success) {
+    HH.toast(result.error || 'Could not save delivery proof. Please try again.', 'error');
+    previewEl.innerHTML = '';
+    return;
+  }
+
+  HH.toast('Delivery proof received — thanks!', 'success');
+  await loadOrders();
+}
+
+async function loadOrders() {
+  const result = await HH.get('getBuyerOrders', { whatsapp: buyerWa });
+
+  if (!result.success) {
+    document.getElementById('ordersList').innerHTML = `<div class="err-box"><span class="err-box__icon">⚠️</span><span>${HH.esc(result.error || 'Could not load your orders.')}</span></div>`;
+    return;
+  }
+
+  ordersCache = result.orders;
+  document.getElementById('welcomeText').textContent =
+    result.orders.length ? `Showing orders for ${buyerWa}` : `No orders found yet for ${buyerWa}`;
+
+  renderStats(result.stats);
+  renderNeedsProofBanner(result.stats.needs_delivery_proof);
+  renderOrders(result.orders);
+}
+
+document.getElementById('switchNumberBtn').addEventListener('click', function () {
+  HH.clearSession('buyer_wa');
+  localStorage.removeItem('hh_buyer_wa');
+  location.href = 'buyer-login.html';
+});
+
+document.getElementById('menuBtn').addEventListener('click', function () {
+  document.getElementById('mobileMenu').classList.toggle('topnav__mobile-menu--open');
+});
+
+document.addEventListener('DOMContentLoaded', async function () {
+  HH.mount();
+
+  buyerWa = localStorage.getItem('hh_buyer_wa');
+  if (!buyerWa) {
+    location.href = 'buyer-login.html';
+    return;
+  }
+
+  const settingsResult = await HH.get('getSettings');
+  if (settingsResult.success && settingsResult.settings) {
+    HH.setCurrencySymbol(settingsResult.settings.currency_symbol);
+  }
+
+  loadOrders();
+});
+</script>
+</body>
+</html>

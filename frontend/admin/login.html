@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Happiness Hub</title>
+<link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<section class="hero" style="min-height:100vh; display:flex; align-items:center; padding:0;">
+  <div class="hero__orb hero__orb--1"></div>
+  <div class="hero__orb hero__orb--2"></div>
+  <div class="hero__orb hero__orb--3"></div>
+  <div class="container hero__content">
+    <div class="topnav__logo" style="width:56px; height:56px; font-size:26px; margin:0 auto 24px;">💰</div>
+    <div class="eyebrow" style="justify-content:center;">Admin Console</div>
+    <h1 class="gradient-text">Happiness Hub Admin</h1>
+    <p>Manage products, agents, sellers, and every order from one dashboard.</p>
+
+    <div class="card-glow slide-up" style="max-width:360px; margin:32px auto 0; text-align:left;">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">Admin Password</label>
+        <input type="password" id="adminPassword" class="form-control" placeholder="••••" autocomplete="current-password" inputmode="numeric">
+        <div class="form-error hidden" id="passwordError">Incorrect password. Please try again.</div>
+      </div>
+      <button class="btn-primary btn-block" id="enterBtn" style="font-size:15px; padding:14px 0;">Enter Dashboard →</button>
+    </div>
+  </div>
+</section>
+
+<script src="../lib/hh.js"></script>
+<script>
+// Client-side gate only — the admin URL itself isn't public, and backend
+// admin actions remain open per the original design. This password simply
+// adds a speed bump before localStorage.hh_admin is set.
+const ADMIN_PASSWORD = '5566';
+
+const passwordInput = document.getElementById('adminPassword');
+const passwordError = document.getElementById('passwordError');
+const enterBtn = document.getElementById('enterBtn');
+
+function attemptLogin() {
+  if (passwordInput.value.trim() !== ADMIN_PASSWORD) {
+    passwordError.classList.remove('hidden');
+    passwordInput.style.borderColor = '#ff4f67';
+    passwordInput.focus();
+    return;
+  }
+  passwordError.classList.add('hidden');
+  localStorage.setItem('hh_admin', JSON.stringify({ token: 'admin_direct', actor_id: 'admin', actor_type: 'admin' }));
+  location.href = 'index.html';
+}
+
+enterBtn.addEventListener('click', attemptLogin);
+passwordInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') attemptLogin(); });
+passwordInput.addEventListener('input', function () {
+  passwordError.classList.add('hidden');
+  passwordInput.style.borderColor = '';
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  HH.mount();
+  passwordInput.focus();
+});
+</script>
+</body>
+</html>
